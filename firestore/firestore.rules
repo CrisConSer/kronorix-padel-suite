@@ -1,0 +1,337 @@
+rules_version = '2';
+
+// =====================================================================
+// REGLAS DE SEGURIDAD — KRONORIX PADEL SUITE (multi-tenant)
+// =====================================================================
+//
+// Principio rector: el aislamiento entre profesores se garantiza AQUI,
+// no en el código del cliente. El frontend puede tener bugs; estas
+// reglas son la última línea de defensa para que un admin NUNCA pueda
+// leer ni escribir datos de otro tenant, y un alumno NUNCA pueda leer
+// ni escribir datos de otro alumno o de la parte admin.
+//
+// DECISIÓN DE DISEÑO (confirmada y corregida tras pruebas con emulador):
+// El super admin (Kronorix) NO tiene acceso a datos personales de
+// alumnos, ni a bonos ni a pagos de ningún tenant. Solo puede leer/
+// gestionar los metadatos de negocio en /tenants/{tenantId} (nombre,
+// slug, plan, estado activo). Esto es intencional: los datos de
+// alumnos pertenecen al profesor, no a Kronorix.
+// =====================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
+    }
+
+    // Doc de identidad del usuario que llama (no confundir con el doc del recurso)
+    function callerUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function callerRole() {
+      return isSignedIn() ? callerUserDoc().data.role : null;
+    }
+
+    function callerTenantId() {
+      return isSignedIn() ? callerUserDoc().data.tenantId : null;
+    }
+
+    function callerIsActive() {
+      return isSignedIn() && callerUserDoc().data.active == true;
+    }
+
+    // El admin solo puede operar dentro de SU tenant
+    function isAdminOfTenant(tenantId) {
+      return isSignedIn() &&
+        callerIsActive() &&
+        callerRole() == 'admin' &&
+        callerTenantId() == tenantId;
+    }
+
+    // El alumno solo puede operar dentro de SU tenant
+    function isAlumnoOfTenant(tenantId) {
+      return isSignedIn() &&
+        callerIsActive() &&
+        callerRole() == 'alumno' &&
+        callerTenantId() == tenantId;
+    }
+
+    function isAdminOrAlumnoOfTenant(tenantId) {
+      return isAdminOfTenant(tenantId) || isAlumnoOfTenant(tenantId);
+    }
+
+    // ------------------------------------------------------------
+    // /platformAdmins/{uid}
+    // Nadie puede escribir desde el cliente. Solo se gestiona
+    // manualmente o desde un entorno admin (Cloud Function / consola).
+    // ------------------------------------------------------------
+    match /platformAdmins/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if false; // gestionado fuera del cliente, nunca desde la app
+    }
+
+    // ------------------------------------------------------------
+    // /users/{uid}
+    // Cada persona lee su propio doc para saber quién es (role, tenantId).
+    // El super admin puede leer/crear cualquiera (para dar de alta admins).
+    // Un admin puede crear/leer SOLO los docs de usuarios (alumnos) de su
+    // propio tenant — nunca el de otro admin ni el de un alumno ajeno.
+    // ------------------------------------------------------------
+    match /users/{uid} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == uid ||
+        isSuperAdmin() ||
+        (callerRole() == 'admin' && resource.data.tenantId == callerTenantId())
+      );
+
+      allow create: if isSuperAdmin() || (
+        isSignedIn() &&
+        callerRole() == 'admin' &&
+        callerIsActive() &&
+        request.resource.data.role == 'alumno' &&
+        request.resource.data.tenantId == callerTenantId()
+      );
+
+      // Nadie cambia su propio rol o tenantId por su cuenta. El propio
+      // usuario SÍ puede actualizar su fcmToken (para notificaciones
+      // push) — y solo eso, comprobamos que el resto de campos no cambian.
+      allow update: if isSuperAdmin() || (
+        isSignedIn() &&
+        callerRole() == 'admin' &&
+        resource.data.tenantId == callerTenantId() &&
+        resource.data.role == 'alumno' &&
+        request.resource.data.role == 'alumno' &&
+        request.resource.data.tenantId == callerTenantId()
+      ) || (
+        isSignedIn() &&
+        request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken', 'fcmTokenUpdatedAt'])
+      );
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // ------------------------------------------------------------
+    // /tenants/{tenantId}
+    // Solo el super admin crea/edita/borra tenants.
+    // El propio admin del tenant puede leer y actualizar SOLO
+    // su configuración de negocio (branding, config), nunca plan/active.
+    // ------------------------------------------------------------
+    match /tenants/{tenantId} {
+      allow read: if isSuperAdmin() || isAdminOrAlumnoOfTenant(tenantId);
+
+      allow create: if isSuperAdmin();
+
+      allow update: if isSuperAdmin() || (
+        isAdminOfTenant(tenantId) &&
+        // el admin NO puede tocar plan, active, ni reasignarse el tenant a otro id
+        request.resource.data.plan == resource.data.plan &&
+        request.resource.data.active == resource.data.active &&
+        request.resource.data.tenantId == resource.data.tenantId
+      );
+
+      allow delete: if isSuperAdmin();
+
+      // --------------------------------------------------------
+      // Subcolecciones del tenant: alumnos, clases, bonos, pagos...
+      // Regla compartida: solo admin/alumno de ESE tenant, y solo
+      // si el tenant está activo.
+      // --------------------------------------------------------
+
+      function tenantIsActive() {
+        return get(/databases/$(database)/documents/tenants/$(tenantId)).data.active == true;
+      }
+
+      // Ficha de alumno del propio caller (solo tiene sentido si su rol
+      // es 'alumno'). Se usa para comprobar tagsIds al apuntarse a un
+      // hueco — defensa en profundidad además de la validación que ya
+      // hace calendarioClient.ts en el cliente.
+      function callerAlumnoDoc() {
+        return get(/databases/$(database)/documents/tenants/$(tenantId)/alumnos/$(callerUserDoc().data.alumnoId));
+      }
+
+      // CORREGIDO: el super admin NO lee fichas de alumnos (dato
+      // personal/de negocio del profesor). Antes tenía isSuperAdmin()
+      // aquí por error; las pruebas con el emulador lo detectaron.
+      match /alumnos/{alumnoId} {
+        allow read: if isAdminOfTenant(tenantId) ||
+          (isAlumnoOfTenant(tenantId) && alumnoId == callerUserDoc().data.alumnoId);
+
+        // El calendario depende de que cada alumno tenga al menos 1 tag
+        // (sirve para filtrar huecos libres compatibles), así que se
+        // exige aquí también, no solo en la UI.
+        allow create, update: if isAdminOfTenant(tenantId) && tenantIsActive() &&
+          request.resource.data.tagsIds is list &&
+          request.resource.data.tagsIds.size() > 0;
+
+        allow delete: if isAdminOfTenant(tenantId) && tenantIsActive();
+      }
+
+      // Tags: solo el admin los gestiona. Los alumnos pueden LEERLOS
+      // (para ver, por ejemplo, sus propias etiquetas en su ficha si
+      // alguna vez se muestran), pero nunca crearlos/editarlos/borrarlos.
+      match /tags/{tagId} {
+        allow read: if isAdminOrAlumnoOfTenant(tenantId);
+        allow create, update, delete: if isAdminOfTenant(tenantId) && tenantIsActive();
+      }
+
+      // CORREGIDO: mismo criterio que alumnos — datos de negocio del
+      // profesor, el super admin no entra aquí.
+      match /bonos/{bonoId} {
+        allow read: if isAdminOfTenant(tenantId) ||
+          (isAlumnoOfTenant(tenantId) && resource.data.alumnoId == callerUserDoc().data.alumnoId);
+
+        allow create, update, delete: if isAdminOfTenant(tenantId) && tenantIsActive();
+      }
+
+      // CORREGIDO: mismo criterio — pagos son datos económicos del
+      // negocio del profesor, fuera del alcance del super admin.
+      match /pagos/{pagoId} {
+        allow read: if isAdminOfTenant(tenantId) ||
+          (isAlumnoOfTenant(tenantId) && resource.data.alumnoId == callerUserDoc().data.alumnoId);
+
+        // Los pagos solo los registra el profesor, nunca el alumno.
+        allow create, update, delete: if isAdminOfTenant(tenantId) && tenantIsActive();
+      }
+
+      // Las clases (horarios, quién va) se mantienen visibles para el
+      // super admin: es metadato operativo (cuántas clases, ocupación),
+      // no dato personal sensible como nombre/pago/nota del alumno.
+      // Si más adelante decidís que tampoco debe verlas, quitar
+      // isSuperAdmin() también de aquí siguiendo el mismo criterio.
+      // ⚠️ ATENCIÓN: esta regla de /clases es la más compleja de todo
+      // el archivo (cubre 3 casos: apuntarse a hueco, baja simple/con
+      // promoción, apuntarse a lista de espera). No se ha podido probar
+      // con el emulador real en el entorno donde se escribió. ANTES de
+      // confiar en ella, probar explícitamente con el emulador:
+      //   1. Alumno se apunta a un hueco compatible -> debe funcionar
+      //   2. Alumno intenta apuntarse a un hueco SIN tag compatible -> debe fallar
+      //   3. Alumno se da de baja sin lista de espera -> debe funcionar
+      //   4. Alumno se da de baja CON alguien en lista de espera -> debe
+      //      funcionar y promocionar al primero
+      //   5. Alumno se apunta a la lista de espera de un hueco ya lleno -> debe funcionar
+      //   6. Alumno intenta tocar fecha/hora/capacidad -> debe fallar
+      //   7. Alumno intenta apuntar a OTRO alumno (no a sí mismo) -> debe fallar
+      match /clases/{claseId} {
+        allow read: if isSuperAdmin() || isAdminOrAlumnoOfTenant(tenantId);
+
+        // El admin puede crear/editar/borrar clases libremente.
+        allow create, delete: if isAdminOfTenant(tenantId) && tenantIsActive();
+
+        // Update: el admin puede editar todo (asignar alumnos, cambiar
+        // capacidad, fecha, hora, etc).
+        //
+        // El alumno SOLO puede apuntarse a un hueco libre o darse de
+        // baja de la clase, y SOLO afectando a su propio alumnoId — no
+        // puede añadir ni quitar a otros alumnos, ni tocar fecha, hora,
+        // capacidad ni estado. Al apuntarse, además se exige que
+        // comparta al menos 1 tag con tagsCompatibles de la clase
+        // (doble validación: ya se hace en calendarioClient.ts, y se
+        // repite aquí como última línea de defensa).
+        allow update: if (isAdminOfTenant(tenantId) && tenantIsActive()) || (
+          isAlumnoOfTenant(tenantId) && tenantIsActive() &&
+          request.resource.data.fecha == resource.data.fecha &&
+          request.resource.data.hora == resource.data.hora &&
+          request.resource.data.capacidad == resource.data.capacidad &&
+          request.resource.data.estado == resource.data.estado &&
+          (
+            // Caso A: el alumno se apunta a un hueco libre (toca SOLO
+            // alumnosIds, no listaEsperaIds; añade SOLO su propio id,
+            // respeta el cupo, y comparte al menos 1 tag compatible).
+            (
+              request.resource.data.listaEsperaIds == resource.data.listaEsperaIds &&
+              request.resource.data.alumnosIds.size() == resource.data.alumnosIds.size() + 1 &&
+              request.resource.data.alumnosIds.size() <= resource.data.capacidad &&
+              !resource.data.alumnosIds.hasAny([callerUserDoc().data.alumnoId]) &&
+              request.resource.data.alumnosIds.hasAll(resource.data.alumnosIds) &&
+              request.resource.data.alumnosIds.hasAny([callerUserDoc().data.alumnoId]) &&
+              resource.data.tagsCompatibles.hasAny(callerAlumnoDoc().data.tagsIds)
+            )
+            ||
+            // Caso B: el alumno se da de baja. Sin lista de espera, el
+            // tamaño de alumnosIds baja en 1. Si había alguien en
+            // listaEsperaIds, el cliente promociona en la misma
+            // transacción: alguien entra a alumnosIds (tamaño se
+            // mantiene) y baja 1 de listaEsperaIds. Cubrimos ambos
+            // sub-casos sin permitir que el alumno mueva a nadie más
+            // que a sí mismo fuera de alumnosIds.
+            (
+              !request.resource.data.alumnosIds.hasAny([callerUserDoc().data.alumnoId]) &&
+              resource.data.alumnosIds.hasAny([callerUserDoc().data.alumnoId]) &&
+              (
+                // Sin promoción: tamaño baja en 1, listaEsperaIds no cambia.
+                (
+                  request.resource.data.alumnosIds.size() == resource.data.alumnosIds.size() - 1 &&
+                  resource.data.alumnosIds.hasAll(request.resource.data.alumnosIds) &&
+                  request.resource.data.listaEsperaIds == resource.data.listaEsperaIds
+                )
+                ||
+                // Con promoción: tamaño se mantiene (sale uno, entra el
+                // primero de la espera), y listaEsperaIds baja en 1
+                // exactamente el primero de la lista anterior.
+                (
+                  request.resource.data.alumnosIds.size() == resource.data.alumnosIds.size() &&
+                  request.resource.data.listaEsperaIds.size() == resource.data.listaEsperaIds.size() - 1 &&
+                  resource.data.listaEsperaIds.size() > 0 &&
+                  request.resource.data.alumnosIds.hasAny([resource.data.listaEsperaIds[0]]) &&
+                  !request.resource.data.listaEsperaIds.hasAny([resource.data.listaEsperaIds[0]])
+                )
+              )
+            )
+            ||
+            // Caso C: el alumno se apunta a la LISTA DE ESPERA (toca
+            // SOLO listaEsperaIds, no alumnosIds; añade SOLO su propio
+            // id, y comparte al menos 1 tag compatible).
+            (
+              request.resource.data.alumnosIds == resource.data.alumnosIds &&
+              request.resource.data.listaEsperaIds.size() == resource.data.listaEsperaIds.size() + 1 &&
+              !resource.data.listaEsperaIds.hasAny([callerUserDoc().data.alumnoId]) &&
+              request.resource.data.listaEsperaIds.hasAll(resource.data.listaEsperaIds) &&
+              request.resource.data.listaEsperaIds.hasAny([callerUserDoc().data.alumnoId]) &&
+              resource.data.tagsCompatibles.hasAny(callerAlumnoDoc().data.tagsIds)
+            )
+          )
+        );
+      }
+
+      match /clasesRecurrentes/{reglaId} {
+        allow read: if isSuperAdmin() || isAdminOfTenant(tenantId);
+        allow create, update, delete: if isAdminOfTenant(tenantId) && tenantIsActive();
+      }
+
+      // CORREGIDO: el wallet expone saldo/movimientos económicos del
+      // alumno — mismo criterio que pagos, fuera del alcance del super admin.
+      match /wallets/{alumnoId} {
+        allow read: if isAdminOfTenant(tenantId) ||
+          (isAlumnoOfTenant(tenantId) && alumnoId == callerUserDoc().data.alumnoId);
+        allow write: if isAdminOfTenant(tenantId) && tenantIsActive();
+
+        match /movimientos/{movId} {
+          allow read: if isAdminOfTenant(tenantId) ||
+            (isAlumnoOfTenant(tenantId) && alumnoId == callerUserDoc().data.alumnoId);
+          allow write: if isAdminOfTenant(tenantId) && tenantIsActive();
+        }
+      }
+
+      match /notificaciones/{uid}/items/{notifId} {
+        // Cada persona lee solo sus propias notificaciones.
+        allow read: if isSignedIn() && request.auth.uid == uid &&
+          isAdminOrAlumnoOfTenant(tenantId);
+        // Las escribe el sistema (admin SDK / Cloud Function) o el admin del tenant
+        // al disparar un aviso manual.
+        allow write: if isAdminOfTenant(tenantId) && tenantIsActive();
+      }
+    }
+  }
+}
