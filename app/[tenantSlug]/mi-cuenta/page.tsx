@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useSessionUser } from '@/src/useSessionUser';
 import type { AlumnoDoc, ClaseDoc, TagDoc } from '@/src/types';
@@ -47,11 +47,20 @@ export default function MiCuentaPage() {
 
   useEffect(() => {
     if (!tenantId || !alumnoId || user?.role !== 'alumno') return;
+    // Antes esto leía TODA la colección de alumnos y filtraba en el
+    // cliente — pero la regla de seguridad de /alumnos solo permite al
+    // alumno leer SU PROPIO documento, no la colección entera. Una
+    // query sobre la colección completa fallaba con permission-denied
+    // porque Firestore exige que el alumno tuviera acceso a TODOS los
+    // documentos que la query podría devolver, no solo al suyo. Leer
+    // el documento directo por su id sí es válido contra esa regla.
     const unsub = onSnapshot(
-      collection(db, 'tenants', tenantId, 'alumnos'),
+      doc(db, 'tenants', tenantId, 'alumnos', alumnoId),
       (snap) => {
-        const propia = snap.docs.find((d) => d.id === alumnoId);
-        if (propia) setMiFicha(propia.data() as AlumnoDoc);
+        if (snap.exists()) setMiFicha(snap.data() as AlumnoDoc);
+      },
+      (err) => {
+        console.error('Error escuchando mi ficha de alumno:', err);
       }
     );
     return () => unsub();
