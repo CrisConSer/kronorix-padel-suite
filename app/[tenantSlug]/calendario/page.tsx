@@ -117,13 +117,13 @@ export default function CalendarioPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6">
-      <header className="flex items-center justify-between">
+    <div className="max-w-5xl mx-auto p-3 sm:p-6 space-y-6">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">Calendario</h1>
           <p className="text-sm text-zinc-600 mt-1">Clases, cupos y lista de espera.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between sm:justify-start gap-2">
           <button
             onClick={() => {
               const r = mesAnterior(year, month);
@@ -134,7 +134,7 @@ export default function CalendarioPage() {
           >
             ←
           </button>
-          <span className="text-sm font-medium text-zinc-700 w-36 text-center capitalize">
+          <span className="text-sm font-medium text-zinc-700 w-28 sm:w-36 text-center capitalize">
             {nombreMes(year, month)}
           </span>
           <button
@@ -153,27 +153,41 @@ export default function CalendarioPage() {
       {loadingDatos ? (
         <p className="text-sm text-zinc-500">Cargando calendario…</p>
       ) : (
-        <div className="border border-zinc-200 rounded overflow-hidden bg-white">
-          <div className="grid grid-cols-7 bg-zinc-50 border-b border-zinc-200 text-xs font-medium text-zinc-500">
-            {DIAS_SEMANA.map((d) => (
-              <div key={d} className="p-2 text-center">{d}</div>
-            ))}
+        <>
+          {/* Grilla mensual — solo en sm: y superior */}
+          <div className="hidden sm:block border border-zinc-200 rounded overflow-hidden bg-white">
+            <div className="grid grid-cols-7 bg-zinc-50 border-b border-zinc-200 text-xs font-medium text-zinc-500">
+              {DIAS_SEMANA.map((d) => (
+                <div key={d} className="p-2 text-center">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {celdas.map((fecha, i) => (
+                <DiaCelda
+                  key={i}
+                  fecha={fecha}
+                  esHoy={fecha === hoyStr}
+                  clases={fecha ? clasesPorDia.get(fecha) || [] : []}
+                  tagsPorId={tagsPorId}
+                  alumnosPorId={alumnosPorId}
+                  onCrear={() => fecha && setFechaParaCrear(fecha)}
+                  onClickClase={(c) => setClaseSeleccionada(c)}
+                />
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-7">
-            {celdas.map((fecha, i) => (
-              <DiaCelda
-                key={i}
-                fecha={fecha}
-                esHoy={fecha === hoyStr}
-                clases={fecha ? clasesPorDia.get(fecha) || [] : []}
-                tagsPorId={tagsPorId}
-                alumnosPorId={alumnosPorId}
-                onCrear={() => fecha && setFechaParaCrear(fecha)}
-                onClickClase={(c) => setClaseSeleccionada(c)}
-              />
-            ))}
-          </div>
-        </div>
+
+          {/* Vista de agenda — solo en móvil */}
+          <AgendaMovil
+            celdas={celdas}
+            clasesPorDia={clasesPorDia}
+            hoyStr={hoyStr}
+            tagsPorId={tagsPorId}
+            alumnosPorId={alumnosPorId}
+            onCrear={(fecha) => setFechaParaCrear(fecha)}
+            onClickClase={(c) => setClaseSeleccionada(c)}
+          />
+        </>
       )}
 
       {fechaParaCrear && (
@@ -203,6 +217,126 @@ export default function CalendarioPage() {
   );
 }
 
+function AgendaMovil({
+  celdas,
+  clasesPorDia,
+  hoyStr,
+  tagsPorId,
+  alumnosPorId,
+  onCrear,
+  onClickClase,
+}: {
+  celdas: (string | null)[];
+  clasesPorDia: Map<string, ClaseDoc[]>;
+  hoyStr: string;
+  tagsPorId: Map<string, TagDoc>;
+  alumnosPorId: Map<string, AlumnoDoc>;
+  onCrear: (fecha: string) => void;
+  onClickClase: (clase: ClaseDoc) => void;
+}) {
+  // Solo los días reales del mes (sin huecos null de relleno), y de
+  // esos, solo los que tienen clases o son hoy — mostrar los 28-31 días
+  // siempre, incluso vacíos, sería demasiado scroll en móvil.
+  const diasDelMes = celdas.filter((f): f is string => !!f);
+  const diasRelevantes = diasDelMes.filter(
+    (fecha) => fecha === hoyStr || (clasesPorDia.get(fecha) || []).length > 0
+  );
+
+  return (
+    <div className="sm:hidden space-y-2">
+      <button
+        onClick={() => onCrear(hoyStr)}
+        className="w-full text-sm rounded border border-dashed border-zinc-300 text-zinc-500 hover:border-amber-400 hover:text-amber-600 px-3 py-2"
+      >
+        + Crear clase hoy
+      </button>
+      {diasRelevantes.length === 0 && (
+        <p className="text-sm text-zinc-500 text-center py-6">
+          No hay clases este mes todavía.
+        </p>
+      )}
+      {diasRelevantes.map((fecha) => {
+        const clases = clasesPorDia.get(fecha) || [];
+        const esHoy = fecha === hoyStr;
+
+        return (
+          <div
+            key={fecha}
+            className={[
+              'border rounded bg-white overflow-hidden',
+              esHoy ? 'border-amber-300' : 'border-zinc-200',
+            ].join(' ')}
+          >
+            <div
+              className={[
+                'flex items-center justify-between px-3 py-2 text-xs font-medium capitalize',
+                esHoy ? 'bg-amber-50 text-amber-800' : 'bg-zinc-50 text-zinc-600',
+              ].join(' ')}
+            >
+              <span>{formatoFechaLarga(fecha)}</span>
+              <button
+                onClick={() => onCrear(fecha)}
+                className="text-zinc-400 hover:text-amber-600 text-sm leading-none px-1"
+                title="Crear clase este día"
+              >
+                +
+              </button>
+            </div>
+
+            {clases.length > 0 && (
+              <ul className="divide-y divide-zinc-100">
+                {clases.map((c) => {
+                  const cancelada = c.estado.startsWith('cancelada');
+                  const tagPrincipal = (c.tagsCompatibles || [])
+                    .map((id) => tagsPorId.get(id))
+                    .find((t): t is TagDoc => !!t);
+                  const colorBase = tagPrincipal?.color || '#9CA3AF';
+                  const nombresAsignados = c.alumnosIds
+                    .map((id) => alumnosPorId.get(id)?.nombre)
+                    .filter((n): n is string => !!n);
+                  const titulo =
+                    c.titulo ||
+                    (nombresAsignados.length === 0
+                      ? 'Hueco libre'
+                      : nombresAsignados.length <= 2
+                      ? nombresAsignados.join(', ')
+                      : `${nombresAsignados.slice(0, 2).join(', ')} +${nombresAsignados.length - 2}`);
+
+                  return (
+                    <li key={c.claseId}>
+                      <button
+                        onClick={() => onClickClase(c)}
+                        className="w-full text-left px-3 py-2.5 flex items-center gap-2.5"
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: cancelada ? '#D4D4D8' : colorBase }}
+                        />
+                        <span className="text-sm font-medium text-zinc-900 shrink-0">{c.hora}</span>
+                        <span
+                          className={[
+                            'text-sm truncate flex-1',
+                            cancelada ? 'text-zinc-400 line-through' : 'text-zinc-600',
+                          ].join(' ')}
+                        >
+                          {titulo}
+                        </span>
+                        <span className="text-xs text-zinc-400 shrink-0">
+                          {c.alumnosIds.length}/{c.capacidad}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function DiaCelda({
   fecha,
   esHoy,
@@ -221,15 +355,15 @@ function DiaCelda({
   onClickClase: (c: ClaseDoc) => void;
 }) {
   if (!fecha) {
-    return <div className="min-h-[110px] border-b border-r border-zinc-100 bg-zinc-50/40" />;
+    return <div className="min-h-[60px] sm:min-h-[110px] border-b border-r border-zinc-100 bg-zinc-50/40" />;
   }
 
   return (
-    <div className="min-h-[110px] border-b border-r border-zinc-100 p-1.5 flex flex-col gap-1">
+    <div className="min-h-[60px] sm:min-h-[110px] border-b border-r border-zinc-100 p-1 sm:p-1.5 flex flex-col gap-1">
       <div className="flex items-center justify-between">
         <span
           className={[
-            'text-xs font-medium w-5 h-5 flex items-center justify-center rounded-full',
+            'text-[10px] sm:text-xs font-medium w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded-full',
             esHoy ? 'bg-amber-500 text-zinc-950' : 'text-zinc-500',
           ].join(' ')}
         >
@@ -243,7 +377,7 @@ function DiaCelda({
           +
         </button>
       </div>
-      <div className="flex flex-col gap-1 overflow-y-auto">
+      <div className="flex flex-col gap-0.5 sm:gap-1 overflow-y-auto">
         {clases.map((c) => (
           <ClaseChip
             key={c.claseId}
@@ -293,20 +427,27 @@ function ClaseChip({
   const titulo = clase.titulo || tituloAuto;
 
   return (
-    <button
-      onClick={onClick}
-      className={[
-        'text-left text-[11px] leading-tight px-1.5 py-1 rounded border w-full truncate',
-        cancelada ? 'opacity-50 line-through' : '',
-      ].join(' ')}
-      style={
-        cancelada
-          ? { backgroundColor: '#F4F4F5', color: '#A1A1AA', borderColor: '#E4E4E7' }
-          : { backgroundColor: `${colorBase}1A`, color: colorBase, borderColor: `${colorBase}55` }
-      }
-    >
-      <div className="font-medium truncate">{clase.hora} · {titulo}</div>
-      <div className="opacity-80">{clase.alumnosIds.length}/{clase.capacidad}</div>
+    <button onClick={onClick} className="w-full" title={`${clase.hora} · ${titulo}`}>
+      {/* Móvil: solo un punto de color, para no desbordar la celda */}
+      <span
+        className="sm:hidden block w-2 h-2 rounded-full mx-auto"
+        style={{ backgroundColor: cancelada ? '#D4D4D8' : colorBase }}
+      />
+      {/* sm y superior: chip completo con hora y título */}
+      <span
+        className={[
+          'hidden sm:block text-left text-[11px] leading-tight px-1.5 py-1 rounded border w-full truncate',
+          cancelada ? 'opacity-50 line-through' : '',
+        ].join(' ')}
+        style={
+          cancelada
+            ? { backgroundColor: '#F4F4F5', color: '#A1A1AA', borderColor: '#E4E4E7' }
+            : { backgroundColor: `${colorBase}1A`, color: colorBase, borderColor: `${colorBase}55` }
+        }
+      >
+        <span className="font-medium truncate block">{clase.hora} · {titulo}</span>
+        <span className="opacity-80 block">{clase.alumnosIds.length}/{clase.capacidad}</span>
+      </span>
     </button>
   );
 }
@@ -328,7 +469,7 @@ function CrearClaseModal({
 }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-zinc-900 capitalize">
             Nueva clase · {formatoFechaLarga(fecha)}
@@ -697,7 +838,7 @@ function DetalleClaseModal({
   if (editando) {
     return (
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-white rounded-lg p-4 sm:p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-zinc-900">Editar clase</h2>
             <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">
@@ -720,7 +861,7 @@ function DetalleClaseModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-lg font-semibold text-zinc-900 capitalize">
             {clase.titulo ? `${clase.titulo} · ` : ''}
@@ -760,18 +901,18 @@ function DetalleClaseModal({
               {asignados.map((a) => {
                 const asistio = clase.alumnosAsistieron.includes(a.alumnoId);
                 return (
-                  <li key={a.alumnoId} className="flex items-center justify-between text-sm gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                  <li key={a.alumnoId} className="flex items-center justify-between text-sm gap-2 flex-wrap">
+                    <label className="flex items-center gap-2 cursor-pointer min-w-0">
                       <input
                         type="checkbox"
                         checked={asistio}
                         disabled={working}
                         onChange={() => handleToggleAsistencia(a)}
-                        className="rounded"
+                        className="rounded shrink-0"
                       />
-                      <span>{a.nombre}</span>
+                      <span className="truncate">{a.nombre}</span>
                       {a.modalidad === 'bono' && (
-                        <span className="text-xs text-zinc-400">(bono)</span>
+                        <span className="text-xs text-zinc-400 shrink-0">(bono)</span>
                       )}
                     </label>
                     {clase.estado === 'programada' && (
@@ -815,8 +956,8 @@ function DetalleClaseModal({
             ) : (
               <ul className="space-y-1.5">
                 {compatibles.map((a) => (
-                  <li key={a.alumnoId} className="flex items-center justify-between text-sm">
-                    <span>{a.nombre}</span>
+                  <li key={a.alumnoId} className="flex items-center justify-between text-sm gap-2">
+                    <span className="truncate min-w-0">{a.nombre}</span>
                     <AsignarBoton tenantId={tenantId} claseId={clase.claseId} alumno={a} />
                   </li>
                 ))}
