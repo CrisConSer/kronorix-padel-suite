@@ -47,26 +47,28 @@ export default function TenantHomePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-3 sm:p-6 space-y-6">
+    <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-zinc-900 capitalize">
+        <h1 className="text-[26px] font-bold text-zinc-900 tracking-tight capitalize">
           Hola{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}
         </h1>
-        <p className="text-sm text-zinc-600 mt-1 capitalize">{formatoFechaLarga(hoyYmd())}</p>
+        <p className="text-sm text-zinc-500 mt-1 capitalize">{formatoFechaLarga(hoyYmd())}</p>
       </header>
 
-      <section className="border border-zinc-200 rounded bg-white p-4 sm:p-5">
-        <h2 className="text-sm font-semibold text-zinc-700 mb-3">Hoy</h2>
+      <section className="border border-zinc-200/80 rounded-xl bg-white p-5 shadow-sm shadow-zinc-200/50">
+        <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-3.5">
+          Hoy
+        </h2>
         {loadingClases ? (
           <p className="text-sm text-zinc-500">Cargando…</p>
         ) : clasesHoy.length === 0 ? (
           <p className="text-sm text-zinc-500">No tienes clases programadas para hoy.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2.5">
             {clasesHoy.map((c) => (
               <li key={c.claseId} className="flex items-center justify-between text-sm gap-2 flex-wrap">
-                <span className="font-medium text-zinc-900">{c.hora}</span>
-                <span className="text-zinc-500 text-xs">
+                <span className="font-medium text-zinc-900 tabular-nums">{c.hora}</span>
+                <span className="text-zinc-500 text-[13px]">
                   {c.titulo || `${c.alumnosIds.length} alumno${c.alumnosIds.length === 1 ? '' : 's'}`}
                   {' · '}
                   {c.alumnosIds.length}/{c.capacidad}
@@ -77,9 +79,10 @@ export default function TenantHomePage() {
         )}
         <Link
           href={`/${slug}/calendario`}
-          className="inline-block mt-4 text-xs text-amber-600 hover:underline font-medium"
+          className="inline-flex items-center gap-1 mt-4 text-[13px] text-amber-600 hover:text-amber-700 font-medium transition-colors"
         >
-          Ver calendario completo →
+          Ver calendario completo
+          <span aria-hidden>→</span>
         </Link>
       </section>
     </div>

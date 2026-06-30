@@ -117,20 +117,21 @@ export default function CalendarioPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-3 sm:p-6 space-y-6">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-5">
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">Calendario</h1>
-          <p className="text-sm text-zinc-600 mt-1">Clases, cupos y lista de espera.</p>
+          <h1 className="text-[26px] font-bold text-zinc-900 tracking-tight">Calendario</h1>
+          <p className="text-sm text-zinc-500 mt-0.5">Clases, cupos y lista de espera.</p>
         </div>
-        <div className="flex items-center justify-between sm:justify-start gap-2">
+        <div className="flex items-center justify-between sm:justify-start gap-1 bg-white border border-zinc-200/80 rounded-lg p-1 shadow-sm shadow-zinc-200/50">
           <button
             onClick={() => {
               const r = mesAnterior(year, month);
               setYear(r.year);
               setMonth(r.month);
             }}
-            className="rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
+            className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+            aria-label="Mes anterior"
           >
             ←
           </button>
@@ -143,7 +144,8 @@ export default function CalendarioPage() {
               setYear(r.year);
               setMonth(r.month);
             }}
-            className="rounded border px-3 py-1.5 text-sm hover:bg-zinc-50"
+            className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+            aria-label="Mes siguiente"
           >
             →
           </button>
@@ -155,7 +157,7 @@ export default function CalendarioPage() {
       ) : (
         <>
           {/* Grilla mensual — solo en sm: y superior */}
-          <div className="hidden sm:block border border-zinc-200 rounded overflow-hidden bg-white">
+          <div className="hidden sm:block border border-zinc-200/80 rounded-xl overflow-hidden bg-white shadow-sm shadow-zinc-200/50">
             <div className="grid grid-cols-7 bg-zinc-50 border-b border-zinc-200 text-xs font-medium text-zinc-500">
               {DIAS_SEMANA.map((d) => (
                 <div key={d} className="p-2 text-center">{d}</div>
@@ -243,13 +245,17 @@ function AgendaMovil({
   );
 
   return (
-    <div className="sm:hidden space-y-2">
-      <button
-        onClick={() => onCrear(hoyStr)}
-        className="w-full text-sm rounded border border-dashed border-zinc-300 text-zinc-500 hover:border-amber-400 hover:text-amber-600 px-3 py-2"
-      >
-        + Crear clase hoy
-      </button>
+    <div className="sm:hidden space-y-2.5">
+      <label className="flex items-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white px-3.5 py-3 cursor-pointer hover:border-amber-400 transition-colors">
+        <span className="text-amber-600 text-base leading-none">+</span>
+        <span className="text-sm text-zinc-500">Crear clase</span>
+        <input
+          type="date"
+          className="ml-auto bg-transparent text-sm text-zinc-700 outline-none"
+          defaultValue={hoyStr}
+          onChange={(e) => e.target.value && onCrear(e.target.value)}
+        />
+      </label>
       {diasRelevantes.length === 0 && (
         <p className="text-sm text-zinc-500 text-center py-6">
           No hay clases este mes todavía.
@@ -263,20 +269,20 @@ function AgendaMovil({
           <div
             key={fecha}
             className={[
-              'border rounded bg-white overflow-hidden',
-              esHoy ? 'border-amber-300' : 'border-zinc-200',
+              'border rounded-xl bg-white overflow-hidden shadow-sm shadow-zinc-200/50',
+              esHoy ? 'border-amber-300' : 'border-zinc-200/80',
             ].join(' ')}
           >
             <div
               className={[
-                'flex items-center justify-between px-3 py-2 text-xs font-medium capitalize',
-                esHoy ? 'bg-amber-50 text-amber-800' : 'bg-zinc-50 text-zinc-600',
+                'flex items-center justify-between px-3.5 py-2.5 text-xs font-medium capitalize',
+                esHoy ? 'bg-amber-50 text-amber-800' : 'bg-zinc-50/80 text-zinc-500',
               ].join(' ')}
             >
               <span>{formatoFechaLarga(fecha)}</span>
               <button
                 onClick={() => onCrear(fecha)}
-                className="text-zinc-400 hover:text-amber-600 text-sm leading-none px-1"
+                className="text-zinc-400 hover:text-amber-600 text-sm leading-none px-1 transition-colors"
                 title="Crear clase este día"
               >
                 +
