@@ -117,22 +117,35 @@ export default function MiCuentaPage() {
     });
   }, [clases, miFicha, alumnoId]);
 
-  // Mini-calendario: solo clases donde el alumno está confirmado
-  // (alumnosIds), agrupadas por día. Nota: la query de `clases` solo
-  // trae fechas >= hoy, así que navegar a meses anteriores no mostrará
-  // datos — limitación aceptada para esta primera versión, igual que
-  // el calendario del profesor no pagina por rango de fechas todavía.
+  // Mini-calendario: clases donde el alumno está confirmado, MÁS los
+  // huecos libres compatibles con su tag (donde podría apuntarse) —
+  // antes solo se pintaban las confirmadas, así que un hueco disponible
+  // (como el que ve en "Huecos disponibles" más abajo) no aparecía
+  // marcado en el calendario, aunque sí en esa lista. Cada entrada lleva
+  // un flag `confirmada` para poder pintarlas con colores/estilos
+  // distintos y mostrar el botón correcto al hacer clic en el día.
+  //
+  // Nota: la query de `clases` solo trae fechas >= hoy, así que navegar
+  // a meses anteriores no mostrará datos — limitación aceptada para
+  // esta primera versión, igual que el calendario del profesor no
+  // pagina por rango de fechas todavía.
   const misClasesPorDia = useMemo(() => {
-    const map = new Map<string, ClaseDoc[]>();
+    const map = new Map<string, { clase: ClaseDoc; confirmada: boolean }[]>();
     if (!alumnoId) return map;
+    const idsHuecos = new Set(huecosCompatibles.map((c) => c.claseId));
+
     clases.forEach((c) => {
-      if (!c.alumnosIds.includes(alumnoId) || c.estado !== 'programada') return;
+      if (c.estado !== 'programada') return;
+      const confirmada = c.alumnosIds.includes(alumnoId);
+      const esHuecoCompatible = idsHuecos.has(c.claseId);
+      if (!confirmada && !esHuecoCompatible) return;
+
       const lista = map.get(c.fecha) || [];
-      lista.push(c);
+      lista.push({ clase: c, confirmada });
       map.set(c.fecha, lista);
     });
     return map;
-  }, [clases, alumnoId]);
+  }, [clases, alumnoId, huecosCompatibles]);
 
   const tagsPorId = useMemo(() => {
     const map = new Map<string, TagDoc>();
@@ -142,7 +155,7 @@ export default function MiCuentaPage() {
 
   const celdas = useMemo(() => gridDelMes(year, month), [year, month]);
   const hoyStr = hoyYmd();
-  const clasesDelDiaSeleccionado = diaSeleccionado ? misClasesPorDia.get(diaSeleccionado) || [] : [];
+  const entradasDelDiaSeleccionado = diaSeleccionado ? misClasesPorDia.get(diaSeleccionado) || [] : [];
 
   if (loadingUser) return <div className="p-6 text-sm text-zinc-500">Cargando…</div>;
   if (!user || user.role !== 'alumno' || user.tenantSlug !== params.tenantSlug) {
@@ -201,11 +214,13 @@ export default function MiCuentaPage() {
               if (!fecha) {
                 return <div key={i} className="aspect-square border-b border-r border-zinc-100 bg-zinc-50/40" />;
               }
-              const clasesDelDia = misClasesPorDia.get(fecha) || [];
-              const tienesClase = clasesDelDia.length > 0;
-              // Color: el del primer tag compatible de la primera clase del día.
-              const tagDelDia = tienesClase
-                ? (clasesDelDia[0].tagsCompatibles || []).map((id) => tagsPorId.get(id)).find((t) => !!t)
+              const entradasDelDia = misClasesPorDia.get(fecha) || [];
+              const tieneAlgo = entradasDelDia.length > 0;
+              const tieneConfirmada = entradasDelDia.some((e) => e.confirmada);
+              const tieneHueco = entradasDelDia.some((e) => !e.confirmada);
+              // Color: el del primer tag compatible de la primera entrada del día.
+              const tagDelDia = tieneAlgo
+                ? (entradasDelDia[0].clase.tagsCompatibles || []).map((id) => tagsPorId.get(id)).find((t) => !!t)
                 : undefined;
               const color = tagDelDia?.color || '#E8A020';
               const esHoy = fecha === hoyStr;
@@ -214,10 +229,10 @@ export default function MiCuentaPage() {
               return (
                 <button
                   key={i}
-                  onClick={() => tienesClase && setDiaSeleccionado(fecha)}
+                  onClick={() => tieneAlgo && setDiaSeleccionado(fecha)}
                   className={[
                     'aspect-square border-b border-r border-zinc-100 flex flex-col items-center justify-center gap-0.5 text-xs relative',
-                    tienesClase ? 'cursor-pointer hover:bg-zinc-50' : 'cursor-default',
+                    tieneAlgo ? 'cursor-pointer hover:bg-zinc-50' : 'cursor-default',
                     seleccionado ? 'ring-2 ring-inset ring-amber-400' : '',
                   ].join(' ')}
                 >
@@ -229,10 +244,16 @@ export default function MiCuentaPage() {
                   >
                     {diaDelMes(fecha)}
                   </span>
-                  {tienesClase && (
+                  {tieneConfirmada && (
                     <span
                       className="w-1.5 h-1.5 rounded-full"
                       style={{ backgroundColor: color }}
+                    />
+                  )}
+                  {!tieneConfirmada && tieneHueco && (
+                    <span
+                      className="w-1.5 h-1.5 rounded-full border"
+                      style={{ borderColor: color }}
                     />
                   )}
                 </button>
@@ -241,33 +262,22 @@ export default function MiCuentaPage() {
           </div>
         </div>
 
-        {diaSeleccionado && clasesDelDiaSeleccionado.length > 0 && (
-          <div className="mt-3 border border-zinc-200 rounded bg-white p-3 space-y-2">
+        {diaSeleccionado && entradasDelDiaSeleccionado.length > 0 && (
+          <div className="mt-3 border border-zinc-200 rounded bg-white p-3 space-y-3">
             <p className="text-xs font-medium text-zinc-500 capitalize">
               {formatoFechaLarga(diaSeleccionado)}
             </p>
-            {clasesDelDiaSeleccionado.map((c) => {
-              const tagsDeLaClase = (c.tagsCompatibles || [])
-                .map((id) => tagsPorId.get(id))
-                .filter((t): t is TagDoc => !!t);
-              return (
-                <div key={c.claseId} className="flex items-center gap-2 text-sm">
-                  <span className="font-medium text-zinc-900">{c.hora}</span>
-                  <span className="text-zinc-500">
-                    {c.tipo} · {c.duracionMinutos} min{c.pista ? ` · ${c.pista}` : ''}
-                  </span>
-                  {tagsDeLaClase.map((t) => (
-                    <span
-                      key={t.tagId}
-                      className="text-xs px-2 py-0.5 rounded-full font-medium"
-                      style={{ backgroundColor: `${t.color}22`, color: t.color }}
-                    >
-                      {t.nombre}
-                    </span>
-                  ))}
-                </div>
-              );
-            })}
+            {entradasDelDiaSeleccionado.map(({ clase: c, confirmada }) => (
+              <EntradaDiaDetalle
+                key={c.claseId}
+                clase={c}
+                confirmada={confirmada}
+                tagsPorId={tagsPorId}
+                tenantId={tenantId!}
+                alumnoId={alumnoId!}
+                misTagsIds={miFicha?.tagsIds || []}
+              />
+            ))}
           </div>
         )}
       </section>
@@ -493,6 +503,84 @@ function AvisoNotificaciones({ uid }: { uid: string }) {
         {estado === 'pidiendo' ? 'Activando…' : 'Activar recordatorios'}
       </button>
       {mensaje && <p className="text-xs text-red-600 w-full">{mensaje}</p>}
+    </div>
+  );
+}
+
+function EntradaDiaDetalle({
+  clase,
+  confirmada,
+  tagsPorId,
+  tenantId,
+  alumnoId,
+  misTagsIds,
+}: {
+  clase: ClaseDoc;
+  confirmada: boolean;
+  tagsPorId: Map<string, TagDoc>;
+  tenantId: string;
+  alumnoId: string;
+  misTagsIds: string[];
+}) {
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [apuntado, setApuntado] = useState(false);
+
+  const tagsDeLaClase = (clase.tagsCompatibles || [])
+    .map((id) => tagsPorId.get(id))
+    .filter((t): t is TagDoc => !!t);
+
+  const plazasLibres = clase.capacidad - clase.alumnosIds.length;
+
+  async function handleApuntarse() {
+    setWorking(true);
+    setError(null);
+    try {
+      await apuntarseAClase(tenantId, clase.claseId, alumnoId, misTagsIds);
+      setApuntado(true);
+    } catch (e: any) {
+      setError(e?.message || 'No se pudo completar.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2 text-sm flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-medium text-zinc-900">{clase.hora}</span>
+        <span className="text-zinc-500">
+          {clase.tipo} · {clase.duracionMinutos} min{clase.pista ? ` · ${clase.pista}` : ''}
+        </span>
+        {tagsDeLaClase.map((t) => (
+          <span
+            key={t.tagId}
+            className="text-xs px-2 py-0.5 rounded-full font-medium"
+            style={{ backgroundColor: `${t.color}22`, color: t.color }}
+          >
+            {t.nombre}
+          </span>
+        ))}
+        <span
+          className={[
+            'text-xs px-2 py-0.5 rounded-full font-medium',
+            confirmada ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700',
+          ].join(' ')}
+        >
+          {confirmada ? 'Apuntado' : `${plazasLibres} plaza${plazasLibres > 1 ? 's' : ''} libre${plazasLibres > 1 ? 's' : ''}`}
+        </span>
+        {error && <span className="text-xs text-red-600 w-full">{error}</span>}
+      </div>
+      {!confirmada && !apuntado && (
+        <button
+          onClick={handleApuntarse}
+          disabled={working}
+          className="text-xs rounded bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-zinc-950 font-medium px-3 py-1.5 shrink-0"
+        >
+          {working ? 'Apuntando…' : 'Apuntarme'}
+        </button>
+      )}
+      {apuntado && <span className="text-xs text-emerald-700 font-medium shrink-0">¡Apuntado!</span>}
     </div>
   );
 }
