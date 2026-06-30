@@ -1,0 +1,25 @@
+# apphosting.yaml
+# -----------------------------------------------------------------------
+# Configuración del build/runtime de Firebase App Hosting. A diferencia
+# del bloque "apphosting" en firebase.json (que usa el CLI local), este
+# archivo es el que el sistema de build remoto de App Hosting (Cloud
+# Build + buildpacks) lee directamente.
+#
+# El build estaba fallando porque, al ejecutar el chequeo de tipos de
+# Next.js, tocaba también functions/src/crearProfesor.ts — un archivo
+# que depende de firebase-admin/firebase-functions, paquetes que NO
+# están instalados en el contexto del build de la app web (viven en
+# functions/package.json, un proyecto Node aparte). El tsconfig.json ya
+# excluye "functions" del chequeo de tipos, pero forzamos aquí también
+# el comando exacto de build para tener control total y reproducible.
+# -----------------------------------------------------------------------
+
+runConfig:
+  # Recursos mínimos razonables para una app con poco tráfico al
+  # principio (un puñado de profesores). Ajustar más adelante si hace
+  # falta más capacidad.
+  minInstances: 0
+  maxInstances: 3
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512

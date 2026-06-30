@@ -1,0 +1,39 @@
+# .gcloudignore
+# -----------------------------------------------------------------------
+# Cloud Build (usado por Firebase App Hosting para compilar la app) lee
+# este archivo para decidir qué excluir del contexto de build, de forma
+# independiente a .gitignore o a la exclusión del tsconfig.json.
+#
+# La causa del fallo de build fue que Next.js, durante "Running
+# TypeScript", analizaba functions/src/crearProfesor.ts —que importa
+# firebase-admin/firebase-functions, paquetes que solo existen en
+# functions/node_modules, no en el contexto de build de la app web—.
+# Excluyendo la carpeta entera aquí, Cloud Build nunca la copia al
+# entorno de build, así que Next.js no puede ni encontrarla.
+# -----------------------------------------------------------------------
+
+.gcloudignore
+.git
+.gitignore
+
+node_modules/
+.next/
+out/
+
+# Cloud Functions vive como proyecto Node aparte, se despliega con
+# `firebase deploy --only functions`, no con App Hosting.
+functions/
+
+# Scripts y datos de pruebas locales, no forman parte de la app.
+pruebas-reglas/
+emulator-data/
+jdk-21/
+
+# Logs y archivos de depuración
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+
+.env
+.env*.local

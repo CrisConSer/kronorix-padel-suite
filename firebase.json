@@ -25,6 +25,20 @@
       "**/node_modules/**"
     ]
   },
+  "apphosting": {
+    "backendId": "kronorix-padel-suite",
+    "rootDir": "/",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "functions",
+      "pruebas-reglas",
+      "emulator-data",
+      "jdk-21"
+    ]
+  },
   "emulators": {
     "firestore": {
       "port": 8080
