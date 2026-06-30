@@ -18,6 +18,7 @@ import { useSessionUser } from '@/src/useSessionUser';
 import type { AlumnoDoc, ModalidadAlumno, TagDoc } from '@/src/types';
 import { crearAlumno, actualizarAlumno } from '@/src/alumnosClient';
 import { crearTag, borrarTag } from '@/src/tagsClient';
+import { invitarAlumnoYEnviarEmail } from '@/src/invitarAlumnoClient';
 
 /**
  * /[tenantSlug]/alumnos
@@ -194,6 +195,8 @@ function AlumnoRow({
   onEditar: () => void;
 }) {
   const [working, setWorking] = useState(false);
+  const [invitando, setInvitando] = useState(false);
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
   const modalidadLabel: Record<ModalidadAlumno, string> = {
     bono: 'Bono mensual',
@@ -231,6 +234,30 @@ function AlumnoRow({
     }
   }
 
+  async function handleInvitar() {
+    if (!alumno.email) {
+      alert('Este alumno no tiene email. Añádelo desde "Editar" antes de invitarlo.');
+      return;
+    }
+    setInvitando(true);
+    setInviteFeedback(null);
+    try {
+      const resultado = await invitarAlumnoYEnviarEmail(
+        { tenantId, alumnoId: alumno.alumnoId },
+        alumno.email
+      );
+      setInviteFeedback(
+        resultado.reenvio
+          ? 'Email reenviado.'
+          : 'Acceso creado y email enviado.'
+      );
+    } catch (e: any) {
+      setInviteFeedback(e?.message || 'No se pudo enviar la invitación.');
+    } finally {
+      setInvitando(false);
+    }
+  }
+
   const tagsDelAlumno = (alumno.tagsIds || [])
     .map((id) => tagsPorId.get(id))
     .filter((t): t is TagDoc => !!t);
@@ -262,8 +289,23 @@ function AlumnoRow({
         {alumno.notas && (
           <div className="text-xs text-zinc-400 mt-1 italic truncate">{alumno.notas}</div>
         )}
+        <div className="text-xs mt-1 flex items-center gap-2 flex-wrap">
+          {alumno.uid ? (
+            <span className="text-emerald-700">✓ Tiene acceso a la app</span>
+          ) : (
+            <span className="text-zinc-400">Sin acceso a la app todavía</span>
+          )}
+          {inviteFeedback && <span className="text-zinc-500">· {inviteFeedback}</span>}
+        </div>
       </div>
       <div className="shrink-0 flex items-center gap-2">
+        <button
+          onClick={handleInvitar}
+          disabled={invitando}
+          className="text-xs rounded border px-3 py-1.5 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+        >
+          {invitando ? 'Enviando…' : alumno.uid ? 'Reenviar invitación' : 'Invitar'}
+        </button>
         <button
           onClick={onEditar}
           className="text-xs rounded border px-3 py-1.5 text-zinc-700 hover:bg-zinc-50"
@@ -341,9 +383,10 @@ function AlumnoForm({
     setFeedback(null);
     try {
       if (modo === 'crear') {
-        await crearAlumno(tenantId, {
+        const emailTrim = email.trim();
+        const alumnoId = await crearAlumno(tenantId, {
           nombre: nombre.trim(),
-          email: email.trim() || undefined,
+          email: emailTrim || undefined,
           telefono: telefono.trim() || undefined,
           nivel: nivel.trim() || undefined,
           modalidad,
@@ -351,7 +394,26 @@ function AlumnoForm({
           tagsIds,
           createdBy,
         });
-        setFeedback({ type: 'ok', msg: `${nombre} se ha añadido correctamente.` });
+
+        if (emailTrim) {
+          try {
+            await invitarAlumnoYEnviarEmail({ tenantId, alumnoId }, emailTrim);
+            setFeedback({
+              type: 'ok',
+              msg: `${nombre} se ha añadido y se le ha enviado un email a ${emailTrim} para acceder a la app.`,
+            });
+          } catch (inviteError: any) {
+            // El alumno ya está creado aunque la invitación falle —
+            // se puede reintentar con el botón "Invitar" de su fila.
+            setFeedback({
+              type: 'ok',
+              msg: `${nombre} se ha añadido, pero no se pudo enviar el email de invitación. Puedes reintentarlo desde su ficha.`,
+            });
+          }
+        } else {
+          setFeedback({ type: 'ok', msg: `${nombre} se ha añadido correctamente.` });
+        }
+
         setNombre('');
         setEmail('');
         setTelefono('');

@@ -5,19 +5,21 @@ import type { ModalidadAlumno } from './types';
 /**
  * alumnosClient.ts
  * -----------------------------------------------------------------------
- * crearAlumno: alta inicial (sin Cloud Function, ver nota más abajo).
- * actualizarAlumno: edición de una ficha ya existente — nombre, email,
- * teléfono, nivel, modalidad, notas y tags. Separado de crearAlumno
- * porque la UI de edición es un formulario distinto (modal), y porque
- * edición nunca debe poder cambiar `estado`/`fechaBaja` (eso lo hace
- * el flujo de dar de baja/reactivar, ver AlumnosPage) ni `createdBy`/
- * `createdAt` (histórico, no se toca).
+ * crearAlumno: alta inicial (sin Cloud Function). actualizarAlumno:
+ * edición de una ficha ya existente — nombre, email, teléfono, nivel,
+ * modalidad, notas y tags. Separado de crearAlumno porque la UI de
+ * edición es un formulario distinto (modal), y porque edición nunca
+ * debe poder cambiar `estado`/`fechaBaja` (eso lo hace el flujo de dar
+ * de baja/reactivar, ver AlumnosPage) ni `createdBy`/`createdAt`
+ * (histórico, no se toca).
  *
- * A diferencia de crearProfesor (que necesita el Admin SDK porque crea
- * un usuario de Firebase Auth), dar de alta o editar un alumno NO
- * requiere ninguna cuenta de Auth — el alumno puede existir solo como
- * ficha (alumnoId) sin login propio. Por eso esto se hace directamente
- * desde el cliente con el SDK normal, sin Cloud Function.
+ * Crear la FICHA del alumno no requiere Auth — el alumno puede existir
+ * solo como ficha (alumnoId) sin login propio, así que esto se hace
+ * directamente desde el cliente con el SDK normal. La invitación para
+ * darle acceso a la app (crear su usuario de Auth y enviarle el email)
+ * SÍ requiere Cloud Function — ver invitarAlumnoClient.ts, que la
+ * página de Alumnos llama automáticamente justo después de crear la
+ * ficha, si el alumno tiene email.
  * -----------------------------------------------------------------------
  */
 

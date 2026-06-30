@@ -8,9 +8,11 @@
  * -----------------------------------------------------------------------
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.recordatorioClases = exports.crearProfesor = void 0;
+exports.invitarAlumno = exports.recordatorioClases = exports.crearProfesor = void 0;
 var crearProfesor_1 = require("./crearProfesor");
 Object.defineProperty(exports, "crearProfesor", { enumerable: true, get: function () { return crearProfesor_1.crearProfesor; } });
 var recordatorioClases_1 = require("./recordatorioClases");
 Object.defineProperty(exports, "recordatorioClases", { enumerable: true, get: function () { return recordatorioClases_1.recordatorioClases; } });
+var invitarAlumno_1 = require("./invitarAlumno");
+Object.defineProperty(exports, "invitarAlumno", { enumerable: true, get: function () { return invitarAlumno_1.invitarAlumno; } });
 //# sourceMappingURL=index.js.map

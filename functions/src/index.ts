@@ -9,3 +9,4 @@
 
 export { crearProfesor } from './crearProfesor';
 export { recordatorioClases } from './recordatorioClases';
+export { invitarAlumno } from './invitarAlumno';
