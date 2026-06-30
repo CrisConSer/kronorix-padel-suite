@@ -362,6 +362,9 @@ function MiClaseRow({
         <div className="font-medium text-zinc-900 capitalize">
           {formatoFechaLarga(clase.fecha)} · {clase.hora}
         </div>
+        {clase.titulo && (
+          <div className="text-sm text-zinc-700 font-medium mt-0.5">{clase.titulo}</div>
+        )}
         <div className="text-xs text-zinc-500 mt-0.5">
           {clase.tipo} · {clase.duracionMinutos} min{clase.pista ? ` · ${clase.pista}` : ''}
           {enEspera && <span className="ml-2 text-amber-600 font-medium">en lista de espera</span>}
@@ -428,6 +431,9 @@ function HuecoRow({
         <div className="font-medium text-zinc-900 capitalize">
           {formatoFechaLarga(clase.fecha)} · {clase.hora}
         </div>
+        {clase.titulo && (
+          <div className="text-sm text-zinc-700 font-medium mt-0.5">{clase.titulo}</div>
+        )}
         <div className="text-xs text-zinc-500 mt-0.5">
           {clase.tipo} · {plazasLibres} plaza{plazasLibres > 1 ? 's' : ''} libre
           {plazasLibres > 1 ? 's' : ''}
@@ -549,6 +555,9 @@ function EntradaDiaDetalle({
     <div className="flex items-center justify-between gap-2 text-sm flex-wrap">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-medium text-zinc-900">{clase.hora}</span>
+        {clase.titulo && (
+          <span className="font-medium text-zinc-900">{clase.titulo}</span>
+        )}
         <span className="text-zinc-500">
           {clase.tipo} · {clase.duracionMinutos} min{clase.pista ? ` · ${clase.pista}` : ''}
         </span>
