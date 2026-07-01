@@ -236,61 +236,109 @@ function AgendaMovil({
   onCrear: (fecha: string) => void;
   onClickClase: (clase: ClaseDoc) => void;
 }) {
-  // Solo los días reales del mes (sin huecos null de relleno), y de
-  // esos, solo los que tienen clases o son hoy — mostrar los 28-31 días
-  // siempre, incluso vacíos, sería demasiado scroll en móvil.
   const diasDelMes = celdas.filter((f): f is string => !!f);
   const diasRelevantes = diasDelMes.filter(
     (fecha) => fecha === hoyStr || (clasesPorDia.get(fecha) || []).length > 0
   );
 
   return (
-    <div className="sm:hidden space-y-2.5">
-      <label className="flex items-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-white px-3.5 py-3 cursor-pointer hover:border-amber-400 transition-colors">
-        <span className="text-amber-600 text-base leading-none">+</span>
-        <span className="text-sm text-zinc-500">Crear clase</span>
+    <div className="sm:hidden space-y-3">
+      {/* Botón crear clase */}
+      <label
+        className="flex items-center gap-3 rounded-2xl px-4 py-3 cursor-pointer transition-colors"
+        style={{ border: '1.5px dashed #E8A02080', background: '#F4EFE6' }}
+      >
+        <span
+          className="w-7 h-7 flex items-center justify-center rounded-full text-base font-bold shrink-0"
+          style={{ background: '#E8A020', color: '#09090F' }}
+        >
+          +
+        </span>
+        <span className="text-sm font-medium" style={{ color: '#353542' }}>Crear clase</span>
         <input
           type="date"
-          className="ml-auto bg-transparent text-sm text-zinc-700 outline-none"
+          className="ml-auto bg-transparent text-sm outline-none"
+          style={{ color: '#09090F' }}
           defaultValue={hoyStr}
           onChange={(e) => e.target.value && onCrear(e.target.value)}
         />
       </label>
+
       {diasRelevantes.length === 0 && (
-        <p className="text-sm text-zinc-500 text-center py-6">
-          No hay clases este mes todavía.
-        </p>
+        <div className="rounded-2xl border border-dashed border-zinc-300 py-10 text-center">
+          <p className="text-sm text-zinc-400">No hay clases este mes todavía.</p>
+        </div>
       )}
+
       {diasRelevantes.map((fecha) => {
         const clases = clasesPorDia.get(fecha) || [];
         const esHoy = fecha === hoyStr;
+        const [y, m, d] = fecha.split('-').map(Number);
+        const diaSemana = new Date(y, m - 1, d).toLocaleDateString('es-ES', { weekday: 'short' });
+        const mesStr = new Date(y, m - 1, d).toLocaleDateString('es-ES', { month: 'short' });
 
         return (
           <div
             key={fecha}
-            className={[
-              'border rounded-xl bg-white overflow-hidden shadow-sm shadow-zinc-200/50',
-              esHoy ? 'border-amber-300' : 'border-zinc-200/80',
-            ].join(' ')}
+            className="rounded-2xl overflow-hidden"
+            style={{
+              border: esHoy ? '1.5px solid #E8A020' : '1.5px solid #e4e4e7',
+              boxShadow: esHoy ? '0 0 0 3px #E8A02015' : 'none',
+            }}
           >
+            {/* Cabecera del día */}
             <div
-              className={[
-                'flex items-center justify-between px-3.5 py-2.5 text-xs font-medium capitalize',
-                esHoy ? 'bg-amber-50 text-amber-800' : 'bg-zinc-50/80 text-zinc-500',
-              ].join(' ')}
+              className="flex items-center justify-between px-4 py-2.5"
+              style={{
+                background: esHoy ? '#09090F' : '#f9f9f9',
+              }}
             >
-              <span>{formatoFechaLarga(fecha)}</span>
+              <div className="flex items-center gap-2.5">
+                <div className="flex flex-col items-center leading-none">
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-widest"
+                    style={{ color: esHoy ? '#E8A020' : '#a1a1aa' }}
+                  >
+                    {diaSemana}
+                  </span>
+                  <span
+                    className="text-lg font-black"
+                    style={{ color: esHoy ? '#F4EFE6' : '#09090F' }}
+                  >
+                    {d}
+                  </span>
+                  <span
+                    className="text-[10px] uppercase font-medium"
+                    style={{ color: esHoy ? '#F4EFE660' : '#a1a1aa' }}
+                  >
+                    {mesStr}
+                  </span>
+                </div>
+                {esHoy && (
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
+                    style={{ background: '#E8A02020', color: '#E8A020' }}
+                  >
+                    Hoy
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => onCrear(fecha)}
-                className="text-zinc-400 hover:text-amber-600 text-sm leading-none px-1 transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold transition-colors"
+                style={{
+                  background: esHoy ? '#E8A02020' : '#f4f4f5',
+                  color: esHoy ? '#E8A020' : '#71717a',
+                }}
                 title="Crear clase este día"
               >
                 +
               </button>
             </div>
 
+            {/* Lista de clases */}
             {clases.length > 0 && (
-              <ul className="divide-y divide-zinc-100">
+              <ul className="bg-white divide-y divide-zinc-100">
                 {clases.map((c) => {
                   const cancelada = c.estado.startsWith('cancelada');
                   const tagPrincipal = (c.tagsCompatibles || [])
@@ -307,27 +355,48 @@ function AgendaMovil({
                       : nombresAsignados.length <= 2
                       ? nombresAsignados.join(', ')
                       : `${nombresAsignados.slice(0, 2).join(', ')} +${nombresAsignados.length - 2}`);
+                  const lleno = c.alumnosIds.length >= c.capacidad;
 
                   return (
                     <li key={c.claseId}>
                       <button
                         onClick={() => onClickClase(c)}
-                        className="w-full text-left px-3 py-2.5 flex items-center gap-2.5"
+                        className="w-full text-left px-4 py-3 flex items-center gap-3 active:bg-zinc-50 transition-colors"
                       >
+                        {/* Acento de color del tag */}
                         <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: cancelada ? '#D4D4D8' : colorBase }}
+                          className="w-1 self-stretch rounded-full shrink-0"
+                          style={{ background: cancelada ? '#e4e4e7' : colorBase }}
                         />
-                        <span className="text-sm font-medium text-zinc-900 shrink-0">{c.hora}</span>
+                        <span
+                          className="text-sm font-black shrink-0 w-12"
+                          style={{ color: cancelada ? '#a1a1aa' : '#09090F' }}
+                        >
+                          {c.hora}
+                        </span>
                         <span
                           className={[
-                            'text-sm truncate flex-1',
-                            cancelada ? 'text-zinc-400 line-through' : 'text-zinc-600',
+                            'text-sm flex-1 truncate font-medium',
+                            cancelada ? 'text-zinc-400 line-through' : 'text-zinc-700',
                           ].join(' ')}
                         >
                           {titulo}
                         </span>
-                        <span className="text-xs text-zinc-400 shrink-0">
+                        <span
+                          className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                          style={{
+                            background: cancelada
+                              ? '#f4f4f5'
+                              : lleno
+                              ? '#09090F'
+                              : `${colorBase}18`,
+                            color: cancelada
+                              ? '#a1a1aa'
+                              : lleno
+                              ? '#E8A020'
+                              : colorBase,
+                          }}
+                        >
                           {c.alumnosIds.length}/{c.capacidad}
                         </span>
                       </button>
