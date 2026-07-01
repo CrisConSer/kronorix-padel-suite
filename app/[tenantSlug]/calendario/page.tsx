@@ -878,152 +878,286 @@ function DetalleClaseModal({
     );
   }
 
+  // Cupos: cuántos asistieron confirmados vs total asignados
+  const totalAsistieron = asistieronLocal.length;
+  const totalAsignados = asignados.length;
+  const ocupacionPct = clase.capacidad > 0
+    ? Math.round((clase.alumnosIds.length / clase.capacidad) * 100)
+    : 0;
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-lg font-semibold text-zinc-900 capitalize">
-            {clase.titulo ? `${clase.titulo} · ` : ''}
-            {formatoFechaLarga(clase.fecha)} · {clase.hora}
-          </h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">
-            ×
-          </button>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap mb-2">
-          {tagsDeLaClase.map((t) => (
-            <span
-              key={t.tagId}
-              className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ backgroundColor: `${t.color}22`, color: t.color }}
-            >
-              {t.nombre}
-            </span>
-          ))}
-        </div>
-        <p className="text-xs text-zinc-500 mb-4">
-          {clase.tipo} · {clase.duracionMinutos} min{clase.pista ? ` · ${clase.pista}` : ''} ·{' '}
-          {clase.alumnosIds.length}/{clase.capacidad} plazas
-          {clase.estado !== 'programada' && (
-            <span className="ml-2 text-red-600 font-medium">({clase.estado})</span>
+    <div
+      className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      style={{ backgroundColor: 'rgba(9,9,15,0.6)', backdropFilter: 'blur(2px)' }}
+    >
+      <div
+        className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto flex flex-col"
+        style={{
+          background: '#F4EFE6',
+          borderRadius: '20px 20px 0 0',
+          boxShadow: '0 -4px 40px rgba(9,9,15,0.18)',
+        }}
+      >
+        {/* ── CABECERA OSCURA ── */}
+        <div
+          className="relative px-5 pt-5 pb-4 shrink-0"
+          style={{ background: '#09090F', borderRadius: 'inherit inherit 0 0' }}
+        >
+          {/* Tags en la parte superior */}
+          {tagsDeLaClase.length > 0 && (
+            <div className="flex gap-1.5 mb-3 flex-wrap">
+              {tagsDeLaClase.map((t) => (
+                <span
+                  key={t.tagId}
+                  className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold tracking-wide uppercase"
+                  style={{ backgroundColor: `${t.color}30`, color: t.color, border: `1px solid ${t.color}50` }}
+                >
+                  {t.nombre}
+                </span>
+              ))}
+            </div>
           )}
-        </p>
 
-        {error && <div className="text-sm bg-red-50 text-red-700 rounded px-3 py-2 mb-3">{error}</div>}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              {clase.titulo && (
+                <p className="text-[11px] font-semibold tracking-widest uppercase mb-0.5"
+                  style={{ color: '#E8A020' }}>
+                  {clase.titulo}
+                </p>
+              )}
+              <h2 className="text-xl font-bold text-white leading-tight capitalize">
+                {formatoFechaLarga(clase.fecha)}
+              </h2>
+              <p className="text-sm mt-0.5" style={{ color: '#E8A02099' }}>
+                {clase.hora} · {clase.duracionMinutos} min
+                {clase.pista ? ` · ${clase.pista}` : ''}
+                {clase.tipo ? ` · ${clase.tipo}` : ''}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-full shrink-0 text-white/50 hover:text-white hover:bg-white/10 transition-colors text-lg leading-none"
+            >
+              ×
+            </button>
+          </div>
 
-        <section className="mb-4">
-          <h3 className="text-sm font-semibold text-zinc-700 mb-2">Alumnos asignados</h3>
-          {asignados.length === 0 ? (
-            <p className="text-xs text-zinc-400">Sin alumnos asignados.</p>
-          ) : (
-            <ul className="space-y-1.5">
-              {asignados.map((a) => {
-                const asistio = asistieronLocal.includes(a.alumnoId);
-                return (
-                  <li key={a.alumnoId} className="flex items-center justify-between text-sm gap-2 flex-wrap">
-                    <label className="flex items-center gap-2 cursor-pointer min-w-0">
-                      <input
-                        type="checkbox"
-                        checked={asistio}
-                        disabled={working}
-                        onChange={() => handleToggleAsistencia(a)}
-                        className="rounded shrink-0"
-                      />
-                      <span className="truncate">{a.nombre}</span>
-                      {a.modalidad === 'bono' && (
-                        <span className="text-xs text-zinc-400 shrink-0">(bono)</span>
-                      )}
-                    </label>
-                    {clase.estado === 'programada' && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        {esFutura && (
+          {/* Barra de ocupación */}
+          <div className="mt-4">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[11px] font-medium" style={{ color: '#F4EFE680' }}>
+                Ocupación
+              </span>
+              <span className="text-[11px] font-bold" style={{ color: '#E8A020' }}>
+                {clase.alumnosIds.length}/{clase.capacidad} plazas
+              </span>
+            </div>
+            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(244,239,230,0.12)' }}>
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${ocupacionPct}%`,
+                  background: ocupacionPct >= 100 ? '#C04810' : '#E8A020',
+                }}
+              />
+            </div>
+          </div>
+
+          {clase.estado !== 'programada' && (
+            <div className="mt-3 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: '#C0481022', color: '#C04810' }}>
+              Clase {clase.estado}
+            </div>
+          )}
+        </div>
+
+        {/* ── CUERPO CLARO ── */}
+        <div className="px-5 py-4 space-y-5">
+
+          {error && (
+            <div className="text-sm rounded-xl px-4 py-3 font-medium" style={{ background: '#C0481015', color: '#C04810' }}>
+              {error}
+            </div>
+          )}
+
+          {/* Asistencia */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold tracking-widest uppercase" style={{ color: '#353542' }}>
+                Asistencia
+              </h3>
+              {asignados.length > 0 && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: '#09090F', color: '#E8A020' }}>
+                  {totalAsistieron}/{totalAsignados}
+                </span>
+              )}
+            </div>
+            {asignados.length === 0 ? (
+              <p className="text-sm text-zinc-400 italic">Sin alumnos asignados.</p>
+            ) : (
+              <ul className="space-y-2">
+                {asignados.map((a) => {
+                  const asistio = asistieronLocal.includes(a.alumnoId);
+                  return (
+                    <li
+                      key={a.alumnoId}
+                      className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 transition-all"
+                      style={{
+                        background: asistio ? '#09090F' : 'white',
+                        border: `1.5px solid ${asistio ? '#E8A020' : '#e5e7eb'}`,
+                      }}
+                    >
+                      <label className="flex items-center gap-3 cursor-pointer min-w-0 flex-1">
+                        {/* Checkbox custom */}
+                        <span
+                          onClick={() => !working && handleToggleAsistencia(a)}
+                          className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 transition-all cursor-pointer"
+                          style={{
+                            background: asistio ? '#E8A020' : 'transparent',
+                            border: `2px solid ${asistio ? '#E8A020' : '#d1d5db'}`,
+                          }}
+                        >
+                          {asistio && (
+                            <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                              <path d="M1 4L4 7L10 1" stroke="#09090F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </span>
+                        <span
+                          className="text-sm font-medium truncate"
+                          onClick={() => !working && handleToggleAsistencia(a)}
+                          style={{ color: asistio ? '#F4EFE6' : '#09090F' }}
+                        >
+                          {a.nombre}
+                        </span>
+                        {a.modalidad === 'bono' && (
+                          <span
+                            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                            style={{
+                              background: asistio ? '#E8A02022' : '#f4f4f5',
+                              color: asistio ? '#E8A020' : '#71717a',
+                            }}
+                          >
+                            bono
+                          </span>
+                        )}
+                      </label>
+                      {clase.estado === 'programada' && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {esFutura && (
+                            <button
+                              disabled={working}
+                              onClick={() => handleBaja(a.alumnoId, true)}
+                              className="text-[11px] font-medium px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
+                              style={{ color: '#92400e', background: '#fef3c7' }}
+                              title="El alumno avisó que no puede venir"
+                            >
+                              Canceló
+                            </button>
+                          )}
                           <button
                             disabled={working}
-                            onClick={() => handleBaja(a.alumnoId, true)}
-                            className="text-xs text-amber-700 hover:underline disabled:opacity-50"
-                            title="El alumno avisó que no puede venir"
+                            onClick={() => handleBaja(a.alumnoId, false)}
+                            className="text-[11px] font-medium px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
+                            style={{ color: '#991b1b', background: '#fee2e2' }}
+                            title="Quitarlo sin registrar como cancelación"
                           >
-                            Canceló
+                            Quitar
                           </button>
-                        )}
-                        <button
-                          disabled={working}
-                          onClick={() => handleBaja(a.alumnoId, false)}
-                          className="text-xs text-red-600 hover:underline disabled:opacity-50"
-                          title="Quitarlo sin registrar como cancelación (ej. error al asignarlo)"
-                        >
-                          Quitar
-                        </button>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-
-        {clase.estado === 'programada' && hayHueco && (
-          <section className="mb-4">
-            <h3 className="text-sm font-semibold text-zinc-700 mb-2">
-              Hueco libre — alumnos compatibles (mismo tag)
-            </h3>
-            {compatibles.length === 0 ? (
-              <p className="text-xs text-zinc-400">
-                No hay alumnos con un tag en común con los ya asignados.
-              </p>
-            ) : (
-              <ul className="space-y-1.5">
-                {compatibles.map((a) => (
-                  <li key={a.alumnoId} className="flex items-center justify-between text-sm gap-2">
-                    <span className="truncate min-w-0">{a.nombre}</span>
-                    <AsignarBoton tenantId={tenantId} claseId={clase.claseId} alumno={a} />
-                  </li>
-                ))}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
-        )}
 
-        {enEspera.length > 0 && (
-          <section className="mb-4">
-            <h3 className="text-sm font-semibold text-zinc-700 mb-2">Lista de espera</h3>
-            <ul className="space-y-1.5">
-              {enEspera.map((a, i) => (
-                <li key={a.alumnoId} className="text-sm text-zinc-600">
-                  {i + 1}. {a.nombre}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+          {/* Huecos compatibles */}
+          {clase.estado === 'programada' && hayHueco && (
+            <section>
+              <h3 className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: '#353542' }}>
+                Hueco libre · compatibles
+              </h3>
+              {compatibles.length === 0 ? (
+                <p className="text-xs text-zinc-400 italic">
+                  Sin alumnos compatibles con el nivel del grupo.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {compatibles.map((a) => (
+                    <li
+                      key={a.alumnoId}
+                      className="flex items-center justify-between gap-2 bg-white rounded-xl px-3 py-2.5 border border-zinc-200"
+                    >
+                      <span className="text-sm font-medium text-zinc-800 truncate min-w-0">{a.nombre}</span>
+                      <AsignarBoton tenantId={tenantId} claseId={clase.claseId} alumno={a} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
-        {clase.notas && (
-          <section className="mb-4">
-            <h3 className="text-sm font-semibold text-zinc-700 mb-1">Notas</h3>
-            <p className="text-sm text-zinc-600">{clase.notas}</p>
-          </section>
-        )}
+          {/* Lista de espera */}
+          {enEspera.length > 0 && (
+            <section>
+              <h3 className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: '#353542' }}>
+                Lista de espera
+              </h3>
+              <ol className="space-y-1.5">
+                {enEspera.map((a, i) => (
+                  <li
+                    key={a.alumnoId}
+                    className="flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 border border-zinc-200 text-sm"
+                  >
+                    <span className="text-xs font-bold w-5 text-center shrink-0" style={{ color: '#E8A020' }}>
+                      {i + 1}
+                    </span>
+                    <span className="text-zinc-700 font-medium">{a.nombre}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
 
-        {clase.estado === 'programada' && (
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setEditando(true)}
-              disabled={working}
-              className="text-xs text-zinc-700 hover:underline disabled:opacity-50"
-            >
-              Editar clase
-            </button>
-            <button
-              onClick={handleCancelarClase}
-              disabled={working}
-              className="text-xs text-red-600 hover:underline disabled:opacity-50"
-            >
-              Cancelar esta clase
-            </button>
-          </div>
-        )}
-      </div>
+          {/* Notas */}
+          {clase.notas && (
+            <section>
+              <h3 className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: '#353542' }}>
+                Notas
+              </h3>
+              <p className="text-sm text-zinc-600 bg-white rounded-xl px-3 py-2.5 border border-zinc-200 leading-relaxed">
+                {clase.notas}
+              </p>
+            </section>
+          )}
+
+          {/* Acciones */}
+          {clase.estado === 'programada' && (
+            <div className="flex items-center gap-3 pt-1 border-t border-zinc-200">
+              <button
+                onClick={() => setEditando(true)}
+                disabled={working}
+                className="text-sm font-medium px-4 py-2 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors"
+                style={{ color: '#353542' }}
+              >
+                Editar clase
+              </button>
+              <button
+                onClick={handleCancelarClase}
+                disabled={working}
+                className="text-sm font-medium px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
+                style={{ color: '#C04810', background: '#C0481012' }}
+              >
+                Cancelar esta clase
+              </button>
+            </div>
+          )}
+
+        </div>{/* fin cuerpo */}
+      </div>{/* fin panel */}
     </div>
   );
 }
@@ -1053,14 +1187,15 @@ function AsignarBoton({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 shrink-0">
       {error && <span className="text-xs text-red-600">{error}</span>}
       <button
         onClick={handleClick}
         disabled={working}
-        className="text-xs rounded border px-2 py-1 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+        className="text-[11px] font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+        style={{ background: '#09090F', color: '#E8A020' }}
       >
-        Asignar
+        {working ? '…' : 'Asignar'}
       </button>
     </div>
   );
