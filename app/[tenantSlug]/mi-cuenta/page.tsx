@@ -293,33 +293,47 @@ export default function MiCuentaPage() {
         </div>
 
         {diaSeleccionado && entradasDelDiaSeleccionado.length > 0 && (
-          <div className="mt-3 border border-zinc-200 rounded bg-white p-3 space-y-3">
-            <p className="text-xs font-medium text-zinc-500 capitalize">
-              {formatoFechaLarga(diaSeleccionado)}
-            </p>
-            {entradasDelDiaSeleccionado.map(({ clase: c, confirmada }) => (
-              <EntradaDiaDetalle
-                key={c.claseId}
-                clase={c}
-                confirmada={confirmada}
-                tagsPorId={tagsPorId}
-                tenantId={tenantId!}
-                alumnoId={alumnoId!}
-                misTagsIds={miFicha?.tagsIds || []}
-              />
-            ))}
+          <div
+            className="mt-3 rounded-2xl overflow-hidden"
+            style={{ border: '1.5px solid #09090F' }}
+          >
+            <div
+              className="px-4 py-2.5 flex items-center gap-2"
+              style={{ background: '#09090F' }}
+            >
+              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#E8A020' }}>
+                {formatoFechaLarga(diaSeleccionado)}
+              </span>
+            </div>
+            <div className="bg-white divide-y divide-zinc-100">
+              {entradasDelDiaSeleccionado.map(({ clase: c, confirmada }) => (
+                <EntradaDiaDetalle
+                  key={c.claseId}
+                  clase={c}
+                  confirmada={confirmada}
+                  tagsPorId={tagsPorId}
+                  tenantId={tenantId!}
+                  alumnoId={alumnoId!}
+                  misTagsIds={miFicha?.tagsIds || []}
+                />
+              ))}
+            </div>
           </div>
         )}
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">Mis próximas clases</h2>
+        <h2 className="text-base font-bold tracking-widest uppercase mb-3" style={{ color: '#09090F' }}>
+          Mis próximas clases
+        </h2>
         {loadingDatos ? (
           <p className="text-sm text-zinc-500">Cargando…</p>
         ) : misClases.length === 0 && misClasesEnEspera.length === 0 ? (
-          <p className="text-sm text-zinc-500">No tienes clases programadas todavía.</p>
+          <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-center">
+            <p className="text-sm text-zinc-400">No tienes clases programadas todavía.</p>
+          </div>
         ) : (
-          <ul className="divide-y divide-zinc-200 rounded border border-zinc-200 bg-white">
+          <ul className="space-y-2">
             {misClases.map((c) => (
               <MiClaseRow key={c.claseId} clase={c} tenantId={tenantId!} alumnoId={alumnoId!} enEspera={false} />
             ))}
@@ -331,15 +345,25 @@ export default function MiCuentaPage() {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">Huecos disponibles</h2>
-        <p className="text-xs text-zinc-500 mb-3">
-          Clases con alguna plaza libre. Tu profesor confirmará que el grupo es compatible
-          con tu nivel.
-        </p>
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="text-base font-bold tracking-widest uppercase" style={{ color: '#09090F' }}>
+            Huecos disponibles
+          </h2>
+          {huecosCompatibles.length > 0 && (
+            <span
+              className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+              style={{ background: '#E8A020', color: '#09090F' }}
+            >
+              {huecosCompatibles.length}
+            </span>
+          )}
+        </div>
         {huecosCompatibles.length === 0 ? (
-          <p className="text-sm text-zinc-500">No hay huecos disponibles ahora mismo.</p>
+          <div className="rounded-2xl border border-dashed border-zinc-300 px-5 py-8 text-center">
+            <p className="text-sm text-zinc-400">No hay huecos disponibles ahora mismo.</p>
+          </div>
         ) : (
-          <ul className="divide-y divide-zinc-200 rounded border border-zinc-200 bg-white">
+          <ul className="space-y-2">
             {huecosCompatibles.map((c) => (
               <HuecoRow
                 key={c.claseId}
@@ -369,15 +393,14 @@ function MiClaseRow({
 }) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
 
   async function handleBaja() {
-    if (!confirm('¿Seguro que quieres darte de baja de esta clase?')) return;
+    if (!confirmando) { setConfirmando(true); return; }
     setWorking(true);
     setError(null);
+    setConfirmando(false);
     try {
-      // Las clases que ve mi-cuenta son siempre futuras (la query las
-      // filtra por fecha >= hoy), así que esta baja siempre cuenta como
-      // cancelación avisada con antelación.
       await darBajaDeClase(tenantId, clase.claseId, alumnoId, undefined, true);
     } catch (e: any) {
       setError(e?.message || 'No se pudo procesar la baja.');
@@ -386,28 +409,97 @@ function MiClaseRow({
     }
   }
 
+  // Día de la semana
+  const [y, m, d] = clase.fecha.split('-').map(Number);
+  const diaSemana = new Date(y, m - 1, d).toLocaleDateString('es-ES', { weekday: 'short' });
+  const diaNum = d;
+  const mesStr = new Date(y, m - 1, d).toLocaleDateString('es-ES', { month: 'short' });
+
   return (
-    <li className="p-4 flex items-center justify-between gap-3 flex-wrap">
-      <div className="min-w-0">
-        <div className="font-medium text-zinc-900 capitalize">
-          {formatoFechaLarga(clase.fecha)} · {clase.hora}
+    <li
+      className="rounded-2xl overflow-hidden"
+      style={{ border: enEspera ? '1.5px solid #E8A02060' : '1.5px solid #09090F' }}
+    >
+      <div className="flex items-stretch">
+        {/* Bloque fecha lateral */}
+        <div
+          className="flex flex-col items-center justify-center px-4 py-3 shrink-0 min-w-[60px]"
+          style={{ background: enEspera ? '#F4EFE6' : '#09090F' }}
+        >
+          <span
+            className="text-[10px] font-bold uppercase tracking-widest"
+            style={{ color: enEspera ? '#E8A020' : '#E8A020' }}
+          >
+            {diaSemana}
+          </span>
+          <span
+            className="text-2xl font-black leading-tight"
+            style={{ color: enEspera ? '#09090F' : '#F4EFE6' }}
+          >
+            {diaNum}
+          </span>
+          <span
+            className="text-[10px] font-medium uppercase"
+            style={{ color: enEspera ? '#35354280' : '#F4EFE680' }}
+          >
+            {mesStr}
+          </span>
         </div>
-        {clase.titulo && (
-          <div className="text-sm text-zinc-700 font-medium mt-0.5">{clase.titulo}</div>
-        )}
-        <div className="text-xs text-zinc-500 mt-0.5">
-          {clase.tipo} · {clase.duracionMinutos} min{clase.pista ? ` · ${clase.pista}` : ''}
-          {enEspera && <span className="ml-2 text-amber-600 font-medium">en lista de espera</span>}
+
+        {/* Contenido */}
+        <div className="flex flex-1 items-center justify-between gap-3 px-4 py-3 bg-white min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-zinc-900 text-sm">{clase.hora}</span>
+              {clase.titulo && (
+                <span className="text-sm font-medium text-zinc-700">{clase.titulo}</span>
+              )}
+              {enEspera && (
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+                  style={{ background: '#E8A02020', color: '#92400e' }}
+                >
+                  En espera
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-zinc-400 mt-0.5">
+              {clase.tipo} · {clase.duracionMinutos} min{clase.pista ? ` · ${clase.pista}` : ''}
+            </div>
+            {error && <div className="text-xs text-red-500 mt-1">{error}</div>}
+          </div>
+
+          {/* Botón baja con confirmación inline */}
+          <div className="shrink-0 flex items-center gap-2">
+            {confirmando ? (
+              <>
+                <button
+                  onClick={() => setConfirmando(false)}
+                  className="text-xs px-2 py-1.5 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+                >
+                  No
+                </button>
+                <button
+                  onClick={handleBaja}
+                  disabled={working}
+                  className="text-xs px-2 py-1.5 rounded-lg font-semibold disabled:opacity-50"
+                  style={{ background: '#C04810', color: 'white' }}
+                >
+                  Sí, darme de baja
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleBaja}
+                disabled={working}
+                className="text-xs px-3 py-1.5 rounded-xl font-medium border border-zinc-200 text-zinc-500 hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+              >
+                Baja
+              </button>
+            )}
+          </div>
         </div>
-        {error && <div className="text-xs text-red-600 mt-1">{error}</div>}
       </div>
-      <button
-        onClick={handleBaja}
-        disabled={working}
-        className="text-xs rounded border px-3 py-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50 shrink-0"
-      >
-        Darme de baja
-      </button>
     </li>
   );
 }
@@ -440,49 +532,80 @@ function HuecoRow({
     }
   }
 
-  async function handleListaEspera() {
-    setWorking(true);
-    setError(null);
-    try {
-      await apuntarseAListaEspera(tenantId, clase.claseId, alumnoId, misTagsIds);
-      setHecho(true);
-    } catch (e: any) {
-      setError(e?.message || 'No se pudo completar.');
-    } finally {
-      setWorking(false);
-    }
+  const plazasLibres = clase.capacidad - clase.alumnosIds.length;
+  const [y, m, d] = clase.fecha.split('-').map(Number);
+  const diaSemana = new Date(y, m - 1, d).toLocaleDateString('es-ES', { weekday: 'short' });
+  const mesStr = new Date(y, m - 1, d).toLocaleDateString('es-ES', { month: 'short' });
+
+  if (hecho) {
+    return (
+      <li
+        className="rounded-2xl overflow-hidden flex items-stretch"
+        style={{ border: '1.5px solid #E8A020' }}
+      >
+        <div
+          className="flex flex-col items-center justify-center px-4 py-3 shrink-0 min-w-[60px]"
+          style={{ background: '#E8A020' }}
+        >
+          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-950">{diaSemana}</span>
+          <span className="text-2xl font-black leading-tight text-zinc-950">{d}</span>
+          <span className="text-[10px] font-medium uppercase text-zinc-900/60">{mesStr}</span>
+        </div>
+        <div className="flex flex-1 items-center gap-3 px-4 py-3 bg-white">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="shrink-0">
+            <circle cx="9" cy="9" r="9" fill="#E8A020" fillOpacity="0.15"/>
+            <path d="M5 9.5L7.5 12L13 6.5" stroke="#92400e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <div>
+            <span className="text-sm font-bold text-zinc-900">¡Apuntado!</span>
+            <p className="text-xs text-zinc-400 mt-0.5">{clase.hora}{clase.titulo ? ` · ${clase.titulo}` : ''}</p>
+          </div>
+        </div>
+      </li>
+    );
   }
 
-  const plazasLibres = clase.capacidad - clase.alumnosIds.length;
-
   return (
-    <li className="p-4 flex items-center justify-between gap-3 flex-wrap">
-      <div className="min-w-0">
-        <div className="font-medium text-zinc-900 capitalize">
-          {formatoFechaLarga(clase.fecha)} · {clase.hora}
+    <li
+      className="rounded-2xl overflow-hidden"
+      style={{ border: '1.5px dashed #E8A02060' }}
+    >
+      <div className="flex items-stretch">
+        {/* Bloque fecha */}
+        <div
+          className="flex flex-col items-center justify-center px-4 py-3 shrink-0 min-w-[60px]"
+          style={{ background: '#F4EFE6' }}
+        >
+          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#E8A020' }}>{diaSemana}</span>
+          <span className="text-2xl font-black leading-tight" style={{ color: '#09090F' }}>{d}</span>
+          <span className="text-[10px] font-medium uppercase" style={{ color: '#35354280' }}>{mesStr}</span>
         </div>
-        {clase.titulo && (
-          <div className="text-sm text-zinc-700 font-medium mt-0.5">{clase.titulo}</div>
-        )}
-        <div className="text-xs text-zinc-500 mt-0.5">
-          {clase.tipo} · {plazasLibres} plaza{plazasLibres > 1 ? 's' : ''} libre
-          {plazasLibres > 1 ? 's' : ''}
-        </div>
-        {error && <div className="text-xs text-red-600 mt-1">{error}</div>}
-      </div>
-      {hecho ? (
-        <span className="text-xs text-emerald-700 font-medium shrink-0">¡Apuntado!</span>
-      ) : (
-        <div className="flex gap-2 shrink-0">
+
+        {/* Contenido */}
+        <div className="flex flex-1 items-center justify-between gap-3 px-4 py-3 bg-white min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-zinc-900 text-sm">{clase.hora}</span>
+              {clase.titulo && (
+                <span className="text-sm font-medium text-zinc-700">{clase.titulo}</span>
+              )}
+            </div>
+            <div className="text-xs text-zinc-400 mt-0.5">
+              {clase.tipo} · {plazasLibres} plaza{plazasLibres !== 1 ? 's' : ''} libre{plazasLibres !== 1 ? 's' : ''}
+            </div>
+            {error && <div className="text-xs text-red-500 mt-1">{error}</div>}
+          </div>
+
           <button
             onClick={handleApuntarse}
             disabled={working}
-            className="text-xs rounded bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-zinc-950 font-medium px-3 py-1.5"
+            className="text-xs font-bold px-4 py-2 rounded-xl disabled:opacity-50 transition-all shrink-0"
+            style={{ background: '#09090F', color: '#E8A020' }}
           >
-            Apuntarme
+            {working ? '…' : 'Apuntarme'}
           </button>
         </div>
-      )}
+      </div>
     </li>
   );
 }
@@ -676,44 +799,45 @@ function EntradaDiaDetalle({
   }
 
   return (
-    <div className="flex items-center justify-between gap-2 text-sm flex-wrap">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="font-medium text-zinc-900">{clase.hora}</span>
+    <div className="flex items-center justify-between gap-3 px-4 py-3 flex-wrap">
+      <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+        <span className="font-bold text-zinc-900 text-sm shrink-0">{clase.hora}</span>
         {clase.titulo && (
-          <span className="font-medium text-zinc-900">{clase.titulo}</span>
+          <span className="font-medium text-zinc-800 text-sm">{clase.titulo}</span>
         )}
-        <span className="text-zinc-500">
+        <span className="text-xs text-zinc-400">
           {clase.tipo} · {clase.duracionMinutos} min{clase.pista ? ` · ${clase.pista}` : ''}
         </span>
         {tagsDeLaClase.map((t) => (
           <span
             key={t.tagId}
-            className="text-xs px-2 py-0.5 rounded-full font-medium"
-            style={{ backgroundColor: `${t.color}22`, color: t.color }}
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide"
+            style={{ backgroundColor: `${t.color}20`, color: t.color, border: `1px solid ${t.color}40` }}
           >
             {t.nombre}
           </span>
         ))}
-        <span
-          className={[
-            'text-xs px-2 py-0.5 rounded-full font-medium',
-            confirmada ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700',
-          ].join(' ')}
-        >
-          {confirmada ? 'Apuntado' : `${plazasLibres} plaza${plazasLibres > 1 ? 's' : ''} libre${plazasLibres > 1 ? 's' : ''}`}
-        </span>
-        {error && <span className="text-xs text-red-600 w-full">{error}</span>}
+        {confirmada && (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+            style={{ background: '#09090F', color: '#E8A020' }}>
+            Apuntado
+          </span>
+        )}
+        {error && <span className="text-xs text-red-500 w-full">{error}</span>}
       </div>
       {!confirmada && !apuntado && (
         <button
           onClick={handleApuntarse}
           disabled={working}
-          className="text-xs rounded bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-zinc-950 font-medium px-3 py-1.5 shrink-0"
+          className="text-xs font-bold px-3 py-1.5 rounded-xl disabled:opacity-50 shrink-0"
+          style={{ background: '#09090F', color: '#E8A020' }}
         >
-          {working ? 'Apuntando…' : 'Apuntarme'}
+          {working ? '…' : 'Apuntarme'}
         </button>
       )}
-      {apuntado && <span className="text-xs text-emerald-700 font-medium shrink-0">¡Apuntado!</span>}
+      {apuntado && (
+        <span className="text-xs font-bold shrink-0" style={{ color: '#E8A020' }}>¡Apuntado!</span>
+      )}
     </div>
   );
 }
