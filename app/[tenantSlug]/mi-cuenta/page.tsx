@@ -5,9 +5,10 @@ import { useParams } from 'next/navigation';
 import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useSessionUser } from '@/src/useSessionUser';
-import type { AlumnoDoc, ClaseDoc, TagDoc } from '@/src/types';
+import type { AlumnoDoc, BonoDoc, ClaseDoc, TagDoc } from '@/src/types';
 import { apuntarseAClase, apuntarseAListaEspera, darBajaDeClase } from '@/src/calendarioClient';
 import { pedirPermisoYGuardarToken } from '@/src/pushClient';
+import { estadoEfectivoBono, clasesRestantes } from '@/src/pagosClient';
 import {
   hoyYmd,
   formatoFechaLarga,
@@ -36,6 +37,7 @@ export default function MiCuentaPage() {
   const alumnoId = user?.alumnoId;
 
   const [miFicha, setMiFicha] = useState<AlumnoDoc | null>(null);
+  const [miBono, setMiBono] = useState<BonoDoc | null>(null);
   const [clases, setClases] = useState<ClaseDoc[]>([]);
   const [tags, setTags] = useState<TagDoc[]>([]);
   const [loadingDatos, setLoadingDatos] = useState(true);
@@ -65,6 +67,21 @@ export default function MiCuentaPage() {
     );
     return () => unsub();
   }, [tenantId, alumnoId, user?.role]);
+
+  // Escucha en tiempo real el bono activo del alumno. Si bonoActualId
+  // cambia (el profesor crea o renueva el bono), se actualiza solo.
+  useEffect(() => {
+    if (!tenantId || !alumnoId || user?.role !== 'alumno') return;
+    if (!miFicha?.bonoActualId) {
+      setMiBono(null);
+      return;
+    }
+    const bonoRef = doc(db, 'tenants', tenantId, 'bonos', miFicha.bonoActualId);
+    const unsub = onSnapshot(bonoRef, (snap) => {
+      setMiBono(snap.exists() ? (snap.data() as BonoDoc) : null);
+    });
+    return () => unsub();
+  }, [tenantId, alumnoId, user?.role, miFicha?.bonoActualId]);
 
   useEffect(() => {
     if (!tenantId || user?.role !== 'alumno') return;
@@ -179,6 +196,10 @@ export default function MiCuentaPage() {
       </header>
 
       <AvisoNotificaciones uid={user.uid} />
+
+      {miFicha?.modalidad === 'bono' && (
+        <BonoBanner bono={miBono} />
+      )}
 
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -518,6 +539,100 @@ function AvisoNotificaciones({ uid }: { uid: string }) {
         {estado === 'pidiendo' ? 'Activando…' : 'Activar recordatorios'}
       </button>
       {mensaje && <p className="text-xs text-red-600 w-full">{mensaje}</p>}
+    </div>
+  );
+}
+
+function BonoBanner({ bono }: { bono: BonoDoc | null }) {
+  if (!bono) {
+    return (
+      <div className="rounded-xl border border-zinc-200 bg-white p-4">
+        <p className="text-sm font-semibold text-zinc-900 mb-0.5">Tu bono</p>
+        <p className="text-xs text-zinc-500">
+          Tu profesor aún no ha registrado ningún bono activo para ti.
+        </p>
+      </div>
+    );
+  }
+
+  const estado = estadoEfectivoBono(bono);
+  const restantes = clasesRestantes(bono);
+  const usadas = bono.clasesConsumidas;
+  const total = bono.clasesContratadas;
+  const porcentajeUsado = total > 0 ? Math.round((usadas / total) * 100) : 0;
+
+  const fechaIni = bono.fechaInicio.toDate().toLocaleDateString('es-ES', {
+    day: 'numeric', month: 'short',
+  });
+  const fechaFin = bono.fechaFin.toDate().toLocaleDateString('es-ES', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
+
+  const estadoColor =
+    estado === 'activo'
+      ? 'bg-emerald-50 text-emerald-700'
+      : estado === 'agotado'
+      ? 'bg-amber-50 text-amber-700'
+      : 'bg-red-50 text-red-700';
+
+  const estadoLabel =
+    estado === 'activo' ? 'Activo' : estado === 'agotado' ? 'Agotado' : 'Caducado';
+
+  // Color de la barra: verde si quedan clases, ámbar si queda ≤1, rojo si agotado.
+  const barColor =
+    estado !== 'activo' || restantes === 0
+      ? 'bg-red-400'
+      : restantes <= 1
+      ? 'bg-amber-400'
+      : 'bg-emerald-400';
+
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-zinc-900">Tu bono</p>
+        <span className={['text-xs px-2 py-0.5 rounded-full font-medium', estadoColor].join(' ')}>
+          {estadoLabel}
+        </span>
+      </div>
+
+      {/* Barra de progreso */}
+      <div>
+        <div className="flex items-end justify-between mb-1.5">
+          <span className="text-3xl font-bold text-zinc-900 leading-none">
+            {restantes}
+          </span>
+          <span className="text-xs text-zinc-500 mb-0.5">
+            de {total} clases restantes
+          </span>
+        </div>
+        <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+          <div
+            className={['h-full rounded-full transition-all', barColor].join(' ')}
+            style={{ width: `${porcentajeUsado}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[11px] text-zinc-400 mt-1">
+          <span>{usadas} usada{usadas !== 1 ? 's' : ''}</span>
+          <span>{total} contratada{total !== 1 ? 's' : ''}</span>
+        </div>
+      </div>
+
+      {/* Detalle */}
+      <div className="flex items-center justify-between text-xs text-zinc-500 pt-1 border-t border-zinc-100">
+        <span>{fechaIni} – {fechaFin}</span>
+        <span className="font-medium text-zinc-700">{bono.precio.toFixed(2)} €</span>
+      </div>
+
+      {estado === 'agotado' && (
+        <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1.5">
+          Has agotado tus clases de este bono. Contacta con tu profesor para renovarlo.
+        </p>
+      )}
+      {estado === 'caducado' && (
+        <p className="text-xs text-red-700 bg-red-50 rounded px-2 py-1.5">
+          Este bono ha caducado. Contacta con tu profesor para renovarlo.
+        </p>
+      )}
     </div>
   );
 }

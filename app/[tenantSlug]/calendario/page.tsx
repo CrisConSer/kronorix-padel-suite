@@ -788,6 +788,11 @@ function DetalleClaseModal({
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editando, setEditando] = useState(false);
+  // Estado optimista: refleja el tick inmediatamente sin esperar al
+  // onSnapshot del calendario (que puede tardar 1-2s tras escribir).
+  const [asistieronLocal, setAsistieronLocal] = useState<string[]>(
+    clase.alumnosAsistieron
+  );
 
   const asignados = clase.alumnosIds.map((id) => alumnosPorId.get(id)).filter((a): a is AlumnoDoc => !!a);
   const enEspera = clase.listaEsperaIds.map((id) => alumnosPorId.get(id)).filter((a): a is AlumnoDoc => !!a);
@@ -811,16 +816,24 @@ function DetalleClaseModal({
   }
 
   async function handleToggleAsistencia(alumno: AlumnoDoc) {
+    const yaAsistio = asistieronLocal.includes(alumno.alumnoId);
+    // Actualización optimista inmediata — el checkbox responde al instante.
+    setAsistieronLocal((prev) =>
+      yaAsistio ? prev.filter((id) => id !== alumno.alumnoId) : [...prev, alumno.alumnoId]
+    );
     setWorking(true);
     setError(null);
     try {
-      const yaAsistio = clase.alumnosAsistieron.includes(alumno.alumnoId);
       if (yaAsistio) {
         await desmarcarAsistencia(tenantId, clase.claseId, alumno.alumnoId, alumno);
       } else {
         await marcarAsistencia(tenantId, clase.claseId, alumno.alumnoId, alumno);
       }
     } catch (e: any) {
+      // Si falla, revertimos el optimismo.
+      setAsistieronLocal((prev) =>
+        yaAsistio ? [...prev, alumno.alumnoId] : prev.filter((id) => id !== alumno.alumnoId)
+      );
       setError(e?.message || 'No se pudo actualizar la asistencia.');
     } finally {
       setWorking(false);
@@ -905,7 +918,7 @@ function DetalleClaseModal({
           ) : (
             <ul className="space-y-1.5">
               {asignados.map((a) => {
-                const asistio = clase.alumnosAsistieron.includes(a.alumnoId);
+                const asistio = asistieronLocal.includes(a.alumnoId);
                 return (
                   <li key={a.alumnoId} className="flex items-center justify-between text-sm gap-2 flex-wrap">
                     <label className="flex items-center gap-2 cursor-pointer min-w-0">
