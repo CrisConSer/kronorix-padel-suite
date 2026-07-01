@@ -53,6 +53,8 @@ export default function CalendarioPage() {
 
   const [fechaParaCrear, setFechaParaCrear] = useState<string | null>(null);
   const [claseSeleccionada, setClaseSeleccionada] = useState<ClaseDoc | null>(null);
+  // Vista en móvil: 'agenda' (lista por día) o 'mes' (cuadrícula compacta)
+  const [vistaMovil, setVistaMovil] = useState<'agenda' | 'mes'>('agenda');
 
   // Clases del tenant (todas; filtramos por mes en memoria, el volumen
   // de un solo profesor es pequeño y así evitamos índices adicionales
@@ -123,32 +125,61 @@ export default function CalendarioPage() {
           <h1 className="text-[26px] font-bold text-zinc-900 tracking-tight">Calendario</h1>
           <p className="text-sm text-zinc-500 mt-0.5">Clases, cupos y lista de espera.</p>
         </div>
-        <div className="flex items-center justify-between sm:justify-start gap-1 bg-white border border-zinc-200/80 rounded-lg p-1 shadow-sm shadow-zinc-200/50">
-          <button
-            onClick={() => {
-              const r = mesAnterior(year, month);
-              setYear(r.year);
-              setMonth(r.month);
-            }}
-            className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
-            aria-label="Mes anterior"
+        <div className="flex items-center gap-2">
+          {/* Toggle vista mes/agenda — solo visible en móvil */}
+          <div
+            className="sm:hidden flex rounded-xl p-1 gap-1"
+            style={{ background: '#09090F' }}
           >
-            ←
-          </button>
-          <span className="text-sm font-medium text-zinc-700 w-28 sm:w-36 text-center capitalize">
-            {nombreMes(year, month)}
-          </span>
-          <button
-            onClick={() => {
-              const r = mesSiguiente(year, month);
-              setYear(r.year);
-              setMonth(r.month);
-            }}
-            className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
-            aria-label="Mes siguiente"
-          >
-            →
-          </button>
+            <button
+              onClick={() => setVistaMovil('agenda')}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+              style={{
+                background: vistaMovil === 'agenda' ? '#E8A020' : 'transparent',
+                color: vistaMovil === 'agenda' ? '#09090F' : '#F4EFE660',
+              }}
+            >
+              Agenda
+            </button>
+            <button
+              onClick={() => setVistaMovil('mes')}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+              style={{
+                background: vistaMovil === 'mes' ? '#E8A020' : 'transparent',
+                color: vistaMovil === 'mes' ? '#09090F' : '#F4EFE660',
+              }}
+            >
+              Mes
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between sm:justify-start gap-1 bg-white border border-zinc-200/80 rounded-lg p-1 shadow-sm shadow-zinc-200/50">
+            <button
+              onClick={() => {
+                const r = mesAnterior(year, month);
+                setYear(r.year);
+                setMonth(r.month);
+              }}
+              className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+              aria-label="Mes anterior"
+            >
+              ←
+            </button>
+            <span className="text-sm font-medium text-zinc-700 w-28 sm:w-36 text-center capitalize">
+              {nombreMes(year, month)}
+            </span>
+            <button
+              onClick={() => {
+                const r = mesSiguiente(year, month);
+                setYear(r.year);
+                setMonth(r.month);
+              }}
+              className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+              aria-label="Mes siguiente"
+            >
+              →
+            </button>
+          </div>
         </div>
       </header>
 
@@ -179,16 +210,27 @@ export default function CalendarioPage() {
             </div>
           </div>
 
-          {/* Vista de agenda — solo en móvil */}
-          <AgendaMovil
-            celdas={celdas}
-            clasesPorDia={clasesPorDia}
-            hoyStr={hoyStr}
-            tagsPorId={tagsPorId}
-            alumnosPorId={alumnosPorId}
-            onCrear={(fecha) => setFechaParaCrear(fecha)}
-            onClickClase={(c) => setClaseSeleccionada(c)}
-          />
+          {/* Vista móvil: agenda o cuadrícula de mes */}
+          {vistaMovil === 'agenda' ? (
+            <AgendaMovil
+              celdas={celdas}
+              clasesPorDia={clasesPorDia}
+              hoyStr={hoyStr}
+              tagsPorId={tagsPorId}
+              alumnosPorId={alumnosPorId}
+              onCrear={(fecha) => setFechaParaCrear(fecha)}
+              onClickClase={(c) => setClaseSeleccionada(c)}
+            />
+          ) : (
+            <MesMovil
+              celdas={celdas}
+              clasesPorDia={clasesPorDia}
+              hoyStr={hoyStr}
+              tagsPorId={tagsPorId}
+              onCrear={(fecha) => setFechaParaCrear(fecha)}
+              onClickClase={(c) => setClaseSeleccionada(c)}
+            />
+          )}
         </>
       )}
 
@@ -214,6 +256,140 @@ export default function CalendarioPage() {
           createdBy={user.uid}
           onClose={() => setClaseSeleccionada(null)}
         />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Vista de mes compacta para móvil: cuadrícula 7 columnas con puntos
+ * de color donde hay clases. Al pulsar un día con clases se abre
+ * directamente el detalle de la primera clase (o el modal de crear si
+ * el día está vacío).
+ */
+function MesMovil({
+  celdas,
+  clasesPorDia,
+  hoyStr,
+  tagsPorId,
+  onCrear,
+  onClickClase,
+}: {
+  celdas: (string | null)[];
+  clasesPorDia: Map<string, ClaseDoc[]>;
+  hoyStr: string;
+  tagsPorId: Map<string, TagDoc>;
+  onCrear: (fecha: string) => void;
+  onClickClase: (clase: ClaseDoc) => void;
+}) {
+  return (
+    <div className="sm:hidden">
+      {/* Botón crear */}
+      <label
+        className="flex items-center gap-3 rounded-2xl px-4 py-3 cursor-pointer mb-3 transition-colors"
+        style={{ border: '1.5px dashed #E8A02080', background: '#F4EFE6' }}
+      >
+        <span
+          className="w-7 h-7 flex items-center justify-center rounded-full text-base font-bold shrink-0"
+          style={{ background: '#E8A020', color: '#09090F' }}
+        >
+          +
+        </span>
+        <span className="text-sm font-medium" style={{ color: '#353542' }}>Crear clase</span>
+        <input
+          type="date"
+          className="ml-auto bg-transparent text-sm outline-none"
+          style={{ color: '#09090F' }}
+          defaultValue={hoyStr}
+          onChange={(e) => e.target.value && onCrear(e.target.value)}
+        />
+      </label>
+
+      {/* Cuadrícula */}
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{ border: '1.5px solid #e4e4e7', background: 'white' }}
+      >
+        {/* Cabecera días semana */}
+        <div className="grid grid-cols-7 border-b border-zinc-100">
+          {DIAS_SEMANA.map((d) => (
+            <div
+              key={d}
+              className="py-2 text-center text-[10px] font-bold uppercase tracking-widest"
+              style={{ color: '#a1a1aa' }}
+            >
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* Celdas */}
+        <div className="grid grid-cols-7">
+          {celdas.map((fecha, i) => {
+            if (!fecha) {
+              return (
+                <div
+                  key={i}
+                  className="aspect-square border-b border-r border-zinc-50"
+                  style={{ background: '#fafafa' }}
+                />
+              );
+            }
+
+            const clasesDia = clasesPorDia.get(fecha) || [];
+            const esHoy = fecha === hoyStr;
+            const tieneClases = clasesDia.length > 0;
+
+            // Hasta 3 puntos de color (uno por clase, del color de su tag)
+            const puntos = clasesDia.slice(0, 3).map((c) => {
+              const tag = (c.tagsCompatibles || [])
+                .map((id) => tagsPorId.get(id))
+                .find((t): t is TagDoc => !!t);
+              return tag?.color || '#E8A020';
+            });
+
+            return (
+              <button
+                key={i}
+                onClick={() => {
+                  if (tieneClases) onClickClase(clasesDia[0]);
+                  else onCrear(fecha);
+                }}
+                className="aspect-square border-b border-r border-zinc-50 flex flex-col items-center justify-center gap-0.5 transition-colors active:bg-zinc-50"
+              >
+                <span
+                  className="w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold transition-all"
+                  style={{
+                    background: esHoy ? '#09090F' : 'transparent',
+                    color: esHoy ? '#E8A020' : tieneClases ? '#09090F' : '#a1a1aa',
+                    fontWeight: tieneClases ? 700 : 400,
+                  }}
+                >
+                  {parseInt(fecha.split('-')[2])}
+                </span>
+                {/* Puntos de clases */}
+                {puntos.length > 0 && (
+                  <div className="flex gap-0.5 justify-center">
+                    {puntos.map((color, pi) => (
+                      <span
+                        key={pi}
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ background: color }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Leyenda del mes */}
+      {Array.from(clasesPorDia.values()).flat().length > 0 && (
+        <p className="text-center text-[11px] mt-3" style={{ color: '#a1a1aa' }}>
+          Pulsa un día para ver o crear clases
+        </p>
       )}
     </div>
   );
