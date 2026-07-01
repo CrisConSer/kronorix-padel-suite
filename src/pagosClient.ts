@@ -188,25 +188,34 @@ export async function borrarPago(tenantId: string, pagoId: string): Promise<void
   const pagoRef = doc(db, 'tenants', tenantId, 'pagos', pagoId);
 
   await runTransaction(db, async (tx) => {
+    // ── Todos los reads primero ──────────────────────────────────────────
     const pagoSnap = await tx.get(pagoRef);
     if (!pagoSnap.exists()) throw new Error('El pago ya no existe.');
     const pago = pagoSnap.data() as PagoDoc;
 
-    tx.delete(pagoRef);
-
+    let bonoSnap = null;
+    let alumnoSnap = null;
     if (pago.tipo === 'bono' && pago.bonoId) {
       const bonoRef = doc(db, 'tenants', tenantId, 'bonos', pago.bonoId);
-      const bonoSnap = await tx.get(bonoRef);
+      bonoSnap = await tx.get(bonoRef);
       if (bonoSnap.exists()) {
-        tx.delete(bonoRef);
-
         const alumnoRef = doc(db, 'tenants', tenantId, 'alumnos', pago.alumnoId);
-        const alumnoSnap = await tx.get(alumnoRef);
-        if (alumnoSnap.exists()) {
-          const alumno = alumnoSnap.data() as AlumnoDoc;
-          if (alumno.bonoActualId === pago.bonoId) {
-            tx.update(alumnoRef, { bonoActualId: null });
-          }
+        alumnoSnap = await tx.get(alumnoRef);
+      }
+    }
+
+    // ── Todos los writes después ─────────────────────────────────────────
+    tx.delete(pagoRef);
+
+    if (pago.tipo === 'bono' && pago.bonoId && bonoSnap?.exists()) {
+      const bonoRef = doc(db, 'tenants', tenantId, 'bonos', pago.bonoId);
+      tx.delete(bonoRef);
+
+      if (alumnoSnap?.exists()) {
+        const alumno = alumnoSnap.data() as AlumnoDoc;
+        if (alumno.bonoActualId === pago.bonoId) {
+          const alumnoRef = doc(db, 'tenants', tenantId, 'alumnos', pago.alumnoId);
+          tx.update(alumnoRef, { bonoActualId: null });
         }
       }
     }
@@ -234,6 +243,7 @@ export async function marcarAsistencia(
   const claseRef = doc(db, 'tenants', tenantId, 'clases', claseId);
 
   await runTransaction(db, async (tx) => {
+    // ── Todos los reads primero ──────────────────────────────────────────
     const claseSnap = await tx.get(claseRef);
     if (!claseSnap.exists()) throw new Error('La clase ya no existe.');
     const clase = claseSnap.data() as ClaseDoc;
@@ -245,23 +255,26 @@ export async function marcarAsistencia(
       return; // ya estaba marcado, no hacer nada (evita doble descuento)
     }
 
+    let bonoSnap = null;
+    if (alumno.modalidad === 'bono' && alumno.bonoActualId) {
+      const bonoRef = doc(db, 'tenants', tenantId, 'bonos', alumno.bonoActualId);
+      bonoSnap = await tx.get(bonoRef);
+    }
+
+    // ── Todos los writes después ─────────────────────────────────────────
     tx.update(claseRef, {
       alumnosAsistieron: [...clase.alumnosAsistieron, alumnoId],
     });
 
-    // Descuento automático de bono, solo si aplica.
-    if (alumno.modalidad === 'bono' && alumno.bonoActualId) {
+    if (alumno.modalidad === 'bono' && alumno.bonoActualId && bonoSnap?.exists()) {
       const bonoRef = doc(db, 'tenants', tenantId, 'bonos', alumno.bonoActualId);
-      const bonoSnap = await tx.get(bonoRef);
-      if (bonoSnap.exists()) {
-        const bono = bonoSnap.data() as BonoDoc;
-        const nuevasConsumidas = bono.clasesConsumidas + 1;
-        const agotado = nuevasConsumidas >= bono.clasesContratadas;
-        tx.update(bonoRef, {
-          clasesConsumidas: nuevasConsumidas,
-          estado: agotado ? 'agotado' : bono.estado,
-        });
-      }
+      const bono = bonoSnap.data() as BonoDoc;
+      const nuevasConsumidas = bono.clasesConsumidas + 1;
+      const agotado = nuevasConsumidas >= bono.clasesContratadas;
+      tx.update(bonoRef, {
+        clasesConsumidas: nuevasConsumidas,
+        estado: agotado ? 'agotado' : bono.estado,
+      });
     }
   });
 }
@@ -279,27 +292,32 @@ export async function desmarcarAsistencia(
   const claseRef = doc(db, 'tenants', tenantId, 'clases', claseId);
 
   await runTransaction(db, async (tx) => {
+    // ── Todos los reads primero ──────────────────────────────────────────
     const claseSnap = await tx.get(claseRef);
     if (!claseSnap.exists()) throw new Error('La clase ya no existe.');
     const clase = claseSnap.data() as ClaseDoc;
 
     if (!clase.alumnosAsistieron.includes(alumnoId)) return; // no estaba marcado
 
+    let bonoSnap = null;
+    if (alumno.modalidad === 'bono' && alumno.bonoActualId) {
+      const bonoRef = doc(db, 'tenants', tenantId, 'bonos', alumno.bonoActualId);
+      bonoSnap = await tx.get(bonoRef);
+    }
+
+    // ── Todos los writes después ─────────────────────────────────────────
     tx.update(claseRef, {
       alumnosAsistieron: clase.alumnosAsistieron.filter((id) => id !== alumnoId),
     });
 
-    if (alumno.modalidad === 'bono' && alumno.bonoActualId) {
+    if (alumno.modalidad === 'bono' && alumno.bonoActualId && bonoSnap?.exists()) {
       const bonoRef = doc(db, 'tenants', tenantId, 'bonos', alumno.bonoActualId);
-      const bonoSnap = await tx.get(bonoRef);
-      if (bonoSnap.exists()) {
-        const bono = bonoSnap.data() as BonoDoc;
-        const nuevasConsumidas = Math.max(0, bono.clasesConsumidas - 1);
-        tx.update(bonoRef, {
-          clasesConsumidas: nuevasConsumidas,
-          estado: nuevasConsumidas < bono.clasesContratadas ? 'activo' : bono.estado,
-        });
-      }
+      const bono = bonoSnap.data() as BonoDoc;
+      const nuevasConsumidas = Math.max(0, bono.clasesConsumidas - 1);
+      tx.update(bonoRef, {
+        clasesConsumidas: nuevasConsumidas,
+        estado: nuevasConsumidas < bono.clasesContratadas ? 'activo' : bono.estado,
+      });
     }
   });
 }
