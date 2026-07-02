@@ -32,10 +32,22 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
         style={{ background: '#09090F' }}
       >
         <div className="flex items-center gap-3">
-          <span className="font-black text-base tracking-tight" style={{ color: '#E8A020', fontFamily: 'sans-serif' }}>
-            KRONORIX
-          </span>
-          <span className="w-px h-4 opacity-20" style={{ background: '#F4EFE6' }} />
+          {/* Símbolo VK */}
+          <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
+            <polygon points="2,5 8,5 14,14 8,23 2,23 8,14" fill="#E8A020"/>
+            <rect x="16" y="5" width="5" height="18" rx="1" fill="#F4EFE6"/>
+            <polygon points="21,5 27,5 21,14" fill="#F4EFE6"/>
+            <polygon points="21,14 27,23 21,23" fill="#F4EFE6"/>
+          </svg>
+          <div className="flex flex-col leading-none">
+            <span className="font-black text-[15px] tracking-tight" style={{ color: '#F4EFE6', letterSpacing: '-0.3px' }}>
+              VOLTEK
+            </span>
+            <span className="text-[9px] font-medium tracking-widest" style={{ color: '#E8A02070', letterSpacing: '1.5px' }}>
+              by KRONORIX
+            </span>
+          </div>
+          <span className="w-px h-5 opacity-20 shrink-0" style={{ background: '#F4EFE6' }} />
           <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: '#F4EFE650' }}>
             Super Admin
           </span>
