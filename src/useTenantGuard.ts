@@ -51,8 +51,12 @@ export function useTenantGuard(tenantSlugFromUrl: string): TenantGuardResult {
     }
   }, [loading, user, tenantSlugFromUrl, router]);
 
-  if (loading || !user) {
-    return { loading, allowed: false, mode: null, user: null };
+  if (loading) {
+    return { loading: true, allowed: false, mode: null, user: null };
+  }
+
+  if (!user) {
+    return { loading: false, allowed: false, mode: null, user: null };
   }
 
   if (user.role === 'super_admin') {
