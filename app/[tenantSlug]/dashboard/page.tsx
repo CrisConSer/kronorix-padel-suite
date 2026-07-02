@@ -100,96 +100,255 @@ export default function DashboardPage() {
   const maxIngresoSerie = Math.max(...ingresosSerie.map((m) => m.total), 1);
 
   return (
-    <div className="max-w-5xl mx-auto p-3 sm:p-6 space-y-8">
+    <div className="max-w-5xl mx-auto p-3 sm:p-6 space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-zinc-900">Cuadro de mando</h1>
-        <p className="text-sm text-zinc-600 mt-1">Ocupación, ingresos y alumnos.</p>
+        <h1 className="text-[26px] font-bold tracking-tight" style={{ color: '#09090F' }}>Cuadro de mando</h1>
+        <p className="text-sm mt-0.5" style={{ color: '#71717a' }}>Ocupación, ingresos y alumnos.</p>
       </header>
 
-      {/* Tarjetas resumen */}
-      <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <TarjetaMetrica titulo="Ingresos este mes" valor={`${ingresosMes.toFixed(2)} €`} />
-        <TarjetaMetrica titulo="Ingreso medio / alumno" valor={`${ingresoMedio.toFixed(2)} €`} />
-        <TarjetaMetrica titulo="Ocupación media" valor={`${(ocupacionGlobal * 100).toFixed(0)}%`} />
-        <TarjetaMetrica titulo="Alumnos activos" valor={`${activos}`} sub={`${bajas} de baja`} />
+      {/* ── TARJETAS RESUMEN ── */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <TarjetaMetrica
+          titulo="Ingresos este mes"
+          valor={`${ingresosMes.toFixed(2)} €`}
+          icono="💶"
+          acento="#E8A020"
+        />
+        <TarjetaMetrica
+          titulo="Ingreso medio / alumno"
+          valor={`${ingresoMedio.toFixed(2)} €`}
+          icono="📊"
+          acento="#E8A020"
+        />
+        <TarjetaMetrica
+          titulo="Ocupación media"
+          valor={`${(ocupacionGlobal * 100).toFixed(0)}%`}
+          icono="🎯"
+          acento={ocupacionGlobal >= 0.8 ? '#16a34a' : ocupacionGlobal >= 0.5 ? '#E8A020' : '#C04810'}
+        />
+        <TarjetaMetrica
+          titulo="Alumnos activos"
+          valor={`${activos}`}
+          sub={`${bajas} de baja`}
+          icono="👥"
+          acento="#09090F"
+        />
       </section>
 
-      {/* Ocupación por día de la semana */}
-      <section>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">Ocupación por día de la semana</h2>
-        <div className="border border-zinc-200 rounded bg-white p-4">
-          <div className="flex items-end gap-1.5 sm:gap-3 h-28 sm:h-32">
-            {ocupacionDias.map((d) => (
-              <div key={d.diaSemana} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full flex items-end justify-center h-full">
-                  <div
-                    className="w-full max-w-8 rounded-t bg-amber-400"
-                    style={{ height: `${(d.ocupacionMedia / maxOcupacion) * 100}%` }}
-                    title={`${(d.ocupacionMedia * 100).toFixed(0)}% (${d.totalClases} clases)`}
-                  />
+      {/* ── GRÁFICAS ── */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        {/* Ocupación por día */}
+        <section
+          className="rounded-2xl p-5"
+          style={{ background: 'white', border: '1.5px solid #e4e4e7' }}
+        >
+          <h2 className="text-xs font-bold tracking-widest uppercase mb-4" style={{ color: '#353542' }}>
+            Ocupación por día
+          </h2>
+          <div className="flex items-end gap-1.5 h-28">
+            {ocupacionDias.map((d) => {
+              const pct = maxOcupacion > 0 ? (d.ocupacionMedia / maxOcupacion) * 100 : 0;
+              const esMax = d.ocupacionMedia === maxOcupacion && maxOcupacion > 0;
+              return (
+                <div key={d.diaSemana} className="flex-1 flex flex-col items-center gap-1.5">
+                  <div className="w-full flex items-end justify-center h-full">
+                    <div
+                      className="w-full rounded-t transition-all"
+                      style={{
+                        height: `${Math.max(pct, 4)}%`,
+                        background: esMax ? '#E8A020' : '#09090F',
+                        opacity: pct < 5 ? 0.15 : 1,
+                      }}
+                      title={`${(d.ocupacionMedia * 100).toFixed(0)}% · ${d.totalClases} clases`}
+                    />
+                  </div>
+                  <span className="text-[10px] font-semibold" style={{ color: esMax ? '#E8A020' : '#a1a1aa' }}>
+                    {NOMBRES_DIAS[d.diaSemana]}
+                  </span>
                 </div>
-                <span className="text-xs text-zinc-500">{NOMBRES_DIAS[d.diaSemana]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Ingresos por mes */}
-      <section>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">Ingresos (últimos 6 meses)</h2>
-        <div className="border border-zinc-200 rounded bg-white p-4">
-          <div className="flex items-end gap-1.5 sm:gap-3 h-28 sm:h-32">
-            {ingresosSerie.map((m) => (
-              <div key={m.mes} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full flex items-end justify-center h-full">
-                  <div
-                    className="w-full max-w-10 rounded-t bg-emerald-400"
-                    style={{ height: `${(m.total / maxIngresoSerie) * 100}%` }}
-                    title={`${m.total.toFixed(2)} €`}
-                  />
-                </div>
-                <span className="text-xs text-zinc-500">{m.mes.slice(5)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <div className="grid sm:grid-cols-2 gap-6">
-        {/* Ratio bono vs suelta */}
-        <section>
-          <h2 className="text-lg font-semibold text-zinc-900 mb-3">Bono vs clase suelta</h2>
-          <div className="border border-zinc-200 rounded bg-white p-4 flex items-center gap-6">
-            <div>
-              <div className="text-2xl font-bold text-amber-600">{ratioModalidad.bono}</div>
-              <div className="text-xs text-zinc-500">con bono</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-zinc-700">{ratioModalidad.suelta}</div>
-              <div className="text-xs text-zinc-500">clase suelta</div>
-            </div>
+              );
+            })}
           </div>
         </section>
 
+        {/* Ingresos por mes */}
+        <section
+          className="rounded-2xl p-5"
+          style={{ background: 'white', border: '1.5px solid #e4e4e7' }}
+        >
+          <h2 className="text-xs font-bold tracking-widest uppercase mb-4" style={{ color: '#353542' }}>
+            Ingresos · últimos 6 meses
+          </h2>
+          <div className="flex items-end gap-1.5 h-28">
+            {ingresosSerie.map((m, i) => {
+              const pct = maxIngresoSerie > 0 ? (m.total / maxIngresoSerie) * 100 : 0;
+              const esUltimo = i === ingresosSerie.length - 1;
+              return (
+                <div key={m.mes} className="flex-1 flex flex-col items-center gap-1.5">
+                  <div className="w-full flex items-end justify-center h-full">
+                    <div
+                      className="w-full rounded-t"
+                      style={{
+                        height: `${Math.max(pct, 4)}%`,
+                        background: esUltimo ? '#E8A020' : '#09090F',
+                        opacity: pct < 5 ? 0.15 : esUltimo ? 1 : 0.5,
+                      }}
+                      title={`${m.total.toFixed(2)} €`}
+                    />
+                  </div>
+                  <span className="text-[10px] font-semibold" style={{ color: esUltimo ? '#E8A020' : '#a1a1aa' }}>
+                    {m.mes.slice(5)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+
+      {/* ── FILA INTERMEDIA ── */}
+      <div className="grid sm:grid-cols-3 gap-4">
+        {/* Bono vs suelta */}
+        <section
+          className="rounded-2xl p-5 flex flex-col gap-3"
+          style={{ background: '#09090F', border: '1.5px solid #09090F' }}
+        >
+          <h2 className="text-xs font-bold tracking-widest uppercase" style={{ color: '#E8A02080' }}>
+            Modalidad
+          </h2>
+          <div className="flex items-end gap-4">
+            <div>
+              <div className="text-3xl font-black" style={{ color: '#E8A020' }}>{ratioModalidad.bono}</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#F4EFE680' }}>Bono</div>
+            </div>
+            <div className="w-px self-stretch" style={{ background: '#ffffff15' }} />
+            <div>
+              <div className="text-3xl font-black text-white">{ratioModalidad.suelta}</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#F4EFE680' }}>Suelta</div>
+            </div>
+          </div>
+          {(ratioModalidad.bono + ratioModalidad.suelta) > 0 && (
+            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#ffffff15' }}>
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${(ratioModalidad.bono / (ratioModalidad.bono + ratioModalidad.suelta)) * 100}%`,
+                  background: '#E8A020',
+                }}
+              />
+            </div>
+          )}
+        </section>
+
         {/* Bonos a vigilar */}
-        <section>
-          <h2 className="text-lg font-semibold text-zinc-900 mb-3">Bonos a vigilar</h2>
-          <div className="border border-zinc-200 rounded bg-white p-4">
-            {bonosVigilar.length === 0 ? (
-              <p className="text-sm text-zinc-500">Ningún bono agotado o caducado ahora mismo.</p>
+        <section
+          className="rounded-2xl p-5 sm:col-span-2"
+          style={{ background: 'white', border: '1.5px solid #e4e4e7' }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-bold tracking-widest uppercase" style={{ color: '#353542' }}>
+              Bonos a vigilar
+            </h2>
+            {bonosVigilar.length > 0 && (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#C0481015', color: '#C04810' }}>
+                {bonosVigilar.length}
+              </span>
+            )}
+          </div>
+          {bonosVigilar.length === 0 ? (
+            <p className="text-sm" style={{ color: '#a1a1aa' }}>Todo en orden — ningún bono agotado ni caducado.</p>
+          ) : (
+            <ul className="space-y-2">
+              {bonosVigilar.map((b) => (
+                <li key={b.alumnoId} className="flex items-center justify-between">
+                  <span className="text-sm font-medium" style={{ color: '#09090F' }}>{b.nombre}</span>
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+                    style={
+                      b.estado === 'agotado'
+                        ? { background: '#E8A02018', color: '#92400e' }
+                        : { background: '#C0481015', color: '#C04810' }
+                    }
+                  >
+                    {b.estado === 'agotado' ? 'Agotado' : 'Caducado'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      {/* ── ALERTAS Y RANKING ── */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        {/* Alumnos en riesgo */}
+        <section
+          className="rounded-2xl overflow-hidden"
+          style={{ border: '1.5px solid #e4e4e7' }}
+        >
+          <div
+            className="flex items-center justify-between px-4 py-3"
+            style={{ background: '#09090F' }}
+          >
+            <h2 className="text-xs font-bold tracking-widest uppercase" style={{ color: '#E8A020' }}>
+              En riesgo de abandono
+            </h2>
+            {enRiesgo.length > 0 && (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#C04810', color: 'white' }}>
+                {enRiesgo.length}
+              </span>
+            )}
+          </div>
+          <div className="bg-white">
+            {enRiesgo.length === 0 ? (
+              <p className="text-sm p-4" style={{ color: '#a1a1aa' }}>Ningún alumno en esta situación.</p>
             ) : (
-              <ul className="space-y-2">
-                {bonosVigilar.map((b) => (
-                  <li key={b.alumnoId} className="flex items-center justify-between text-sm">
-                    <span>{b.nombre}</span>
+              <ul className="divide-y divide-zinc-100">
+                {enRiesgo.map((a) => (
+                  <li key={a.alumnoId} className="px-4 py-3 flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold" style={{ color: '#09090F' }}>{a.nombre}</span>
+                    <span className="text-[11px] shrink-0" style={{ color: '#a1a1aa' }}>
+                      {a.clasesMesAnterior} cl. antes · 0 ahora
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {/* Ranking cancelaciones */}
+        <section
+          className="rounded-2xl overflow-hidden"
+          style={{ border: '1.5px solid #e4e4e7' }}
+        >
+          <div
+            className="flex items-center justify-between px-4 py-3"
+            style={{ background: '#09090F' }}
+          >
+            <h2 className="text-xs font-bold tracking-widest uppercase" style={{ color: '#E8A020' }}>
+              Más cancelaciones
+            </h2>
+          </div>
+          <div className="bg-white">
+            {ranking.length === 0 ? (
+              <p className="text-sm p-4" style={{ color: '#a1a1aa' }}>Sin cancelaciones registradas.</p>
+            ) : (
+              <ul className="divide-y divide-zinc-100">
+                {ranking.slice(0, 5).map((r, i) => (
+                  <li key={r.alumnoId} className="px-4 py-3 flex items-center gap-3">
                     <span
-                      className={[
-                        'text-xs px-2 py-0.5 rounded-full font-medium',
-                        b.estado === 'agotado' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700',
-                      ].join(' ')}
+                      className="text-[11px] font-black w-5 text-center shrink-0"
+                      style={{ color: i === 0 ? '#E8A020' : '#a1a1aa' }}
                     >
-                      {b.estado === 'agotado' ? 'Agotado' : 'Caducado'}
+                      {i + 1}
+                    </span>
+                    <span className="text-sm font-medium flex-1 truncate" style={{ color: '#09090F' }}>{r.nombre}</span>
+                    <span
+                      className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                      style={{ background: '#09090F', color: '#E8A020' }}
+                    >
+                      {r.cancelaciones}
                     </span>
                   </li>
                 ))}
@@ -198,64 +357,38 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
-
-      {/* Alumnos en riesgo de abandono */}
-      <section>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">Alumnos en riesgo de abandono</h2>
-        <p className="text-xs text-zinc-500 mb-3">
-          Activos que venían asistiendo y no han venido a ninguna clase en los últimos 30 días.
-        </p>
-        <div className="border border-zinc-200 rounded bg-white">
-          {enRiesgo.length === 0 ? (
-            <p className="text-sm text-zinc-500 p-4">Ningún alumno en esta situación ahora mismo.</p>
-          ) : (
-            <ul className="divide-y divide-zinc-200">
-              {enRiesgo.map((a) => (
-                <li key={a.alumnoId} className="p-3 flex items-center justify-between text-sm">
-                  <span className="font-medium text-zinc-900">{a.nombre}</span>
-                  <span className="text-xs text-zinc-500">
-                    {a.clasesMesAnterior} clases el mes anterior · 0 en los últimos 30 días
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
-
-      {/* Ranking de cancelaciones */}
-      <section>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">Ranking de cancelaciones</h2>
-        <p className="text-xs text-zinc-500 mb-3">
-          Alumnos que más han cancelado avisando con antelación (no incluye bajas sin avisar).
-        </p>
-        <div className="border border-zinc-200 rounded bg-white">
-          {ranking.length === 0 ? (
-            <p className="text-sm text-zinc-500 p-4">Sin cancelaciones registradas todavía.</p>
-          ) : (
-            <ul className="divide-y divide-zinc-200">
-              {ranking.slice(0, 10).map((r, i) => (
-                <li key={r.alumnoId} className="p-3 flex items-center justify-between text-sm">
-                  <span>
-                    {i + 1}. {r.nombre}
-                  </span>
-                  <span className="text-xs text-zinc-500">{r.cancelaciones} cancelaciones</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
     </div>
   );
 }
 
-function TarjetaMetrica({ titulo, valor, sub }: { titulo: string; valor: string; sub?: string }) {
+function TarjetaMetrica({
+  titulo,
+  valor,
+  sub,
+  icono,
+  acento,
+}: {
+  titulo: string;
+  valor: string;
+  sub?: string;
+  icono?: string;
+  acento?: string;
+}) {
   return (
-    <div className="border border-zinc-200 rounded bg-white p-4">
-      <div className="text-xs text-zinc-500">{titulo}</div>
-      <div className="text-2xl font-bold text-zinc-900 mt-1">{valor}</div>
-      {sub && <div className="text-xs text-zinc-400 mt-0.5">{sub}</div>}
+    <div
+      className="rounded-2xl p-4 flex flex-col gap-2"
+      style={{ background: 'white', border: '1.5px solid #e4e4e7' }}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: '#a1a1aa' }}>
+          {titulo}
+        </span>
+        {icono && <span className="text-base">{icono}</span>}
+      </div>
+      <div className="text-2xl font-black leading-none" style={{ color: acento || '#09090F' }}>
+        {valor}
+      </div>
+      {sub && <div className="text-[11px]" style={{ color: '#a1a1aa' }}>{sub}</div>}
     </div>
   );
 }

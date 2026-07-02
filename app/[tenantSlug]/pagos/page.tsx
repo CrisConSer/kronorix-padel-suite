@@ -113,20 +113,30 @@ export default function PagosPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-3 sm:p-6 space-y-8">
+    <div className="max-w-4xl mx-auto p-3 sm:p-6 space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-zinc-900">Pagos</h1>
-        <p className="text-sm text-zinc-600 mt-1">Bonos mensuales y clases sueltas.</p>
+        <h1 className="text-[26px] font-bold tracking-tight" style={{ color: '#09090F' }}>Pagos</h1>
+        <p className="text-sm mt-0.5" style={{ color: '#71717a' }}>Bonos mensuales y clases sueltas.</p>
       </header>
 
+      {/* ── BONOS ── */}
       <section>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">Alumnos con bono</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-bold tracking-widest uppercase" style={{ color: '#353542' }}>Alumnos con bono</h2>
+          {alumnosBono.length > 0 && (
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#09090F', color: '#E8A020' }}>
+              {alumnosBono.length}
+            </span>
+          )}
+        </div>
         {loadingDatos ? (
-          <p className="text-sm text-zinc-500">Cargando…</p>
+          <p className="text-sm" style={{ color: '#a1a1aa' }}>Cargando…</p>
         ) : alumnosBono.length === 0 ? (
-          <p className="text-sm text-zinc-500">No tienes alumnos con modalidad bono.</p>
+          <div className="rounded-2xl border border-dashed border-zinc-300 py-8 text-center">
+            <p className="text-sm" style={{ color: '#a1a1aa' }}>No tienes alumnos con modalidad bono.</p>
+          </div>
         ) : (
-          <ul className="divide-y divide-zinc-200 rounded border border-zinc-200 bg-white">
+          <ul className="space-y-2">
             {alumnosBono.map((a) => {
               const bono = bonosPorAlumno.get(a.alumnoId);
               return (
@@ -143,40 +153,58 @@ export default function PagosPage() {
         )}
       </section>
 
-      <section>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">Alumnos con clase suelta</h2>
-        {alumnosSuelta.length === 0 ? (
-          <p className="text-sm text-zinc-500">No tienes alumnos con modalidad suelta.</p>
-        ) : (
-          <ul className="divide-y divide-zinc-200 rounded border border-zinc-200 bg-white">
+      {/* ── SUELTAS ── */}
+      {alumnosSuelta.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-bold tracking-widest uppercase" style={{ color: '#353542' }}>Clase suelta</h2>
+          </div>
+          <ul className="space-y-2">
             {alumnosSuelta.map((a) => (
-              <li key={a.alumnoId} className="p-4 flex items-center justify-between gap-4">
-                <span className="font-medium text-zinc-900">{a.nombre}</span>
+              <li
+                key={a.alumnoId}
+                className="rounded-2xl flex items-center justify-between gap-3 px-4 py-3 bg-white"
+                style={{ border: '1.5px solid #e4e4e7' }}
+              >
+                <span className="font-semibold text-sm" style={{ color: '#09090F' }}>{a.nombre}</span>
                 <button
                   onClick={() => setAlumnoParaPago(a)}
-                  className="text-xs rounded bg-amber-500 hover:bg-amber-600 text-zinc-950 font-medium px-3 py-1.5"
+                  className="text-xs font-bold px-3 py-1.5 rounded-xl shrink-0 transition-colors"
+                  style={{ background: '#09090F', color: '#E8A020' }}
                 >
                   Registrar pago
                 </button>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
 
+      {/* ── HISTORIAL ── */}
       <section>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">Historial de pagos</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-bold tracking-widest uppercase" style={{ color: '#353542' }}>Historial de pagos</h2>
+          {pagos.length > 0 && (
+            <span className="text-[11px]" style={{ color: '#a1a1aa' }}>Últimos {Math.min(pagos.length, 30)}</span>
+          )}
+        </div>
         {pagos.length === 0 ? (
-          <p className="text-sm text-zinc-500">Todavía no hay pagos registrados.</p>
+          <div className="rounded-2xl border border-dashed border-zinc-300 py-8 text-center">
+            <p className="text-sm" style={{ color: '#a1a1aa' }}>Todavía no hay pagos registrados.</p>
+          </div>
         ) : (
-          <ul className="divide-y divide-zinc-200 rounded border border-zinc-200 bg-white">
-            {pagos.slice(0, 30).map((p) => (
+          <ul
+            className="rounded-2xl overflow-hidden"
+            style={{ border: '1.5px solid #e4e4e7' }}
+          >
+            {pagos.slice(0, 30).map((p, i) => (
               <PagoRow
                 key={p.pagoId}
                 pago={p}
                 nombreAlumno={alumnosPorId.get(p.alumnoId)?.nombre || 'Alumno'}
                 onEditar={() => setPagoParaEditar(p)}
                 onBorrar={() => handleBorrarPago(p)}
+                esUltimo={i === Math.min(pagos.length, 30) - 1}
               />
             ))}
           </ul>
@@ -191,7 +219,6 @@ export default function PagosPage() {
           onClose={() => setAlumnoParaBono(null)}
         />
       )}
-
       {alumnoParaPago && (
         <RegistrarPagoModal
           tenantId={tenantId!}
@@ -200,7 +227,6 @@ export default function PagosPage() {
           onClose={() => setAlumnoParaPago(null)}
         />
       )}
-
       {bonoParaEditar && (
         <EditarBonoModal
           tenantId={tenantId!}
@@ -209,7 +235,6 @@ export default function PagosPage() {
           onClose={() => setBonoParaEditar(null)}
         />
       )}
-
       {pagoParaEditar && (
         <EditarPagoModal
           tenantId={tenantId!}
@@ -235,66 +260,100 @@ function BonoRow({
 }) {
   if (!bono) {
     return (
-      <li className="p-4 flex items-center justify-between gap-4">
-        <span className="font-medium text-zinc-900">{alumno.nombre}</span>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-400">Sin bono activo</span>
-          <button
-            onClick={onCrearBono}
-            className="text-xs rounded bg-amber-500 hover:bg-amber-600 text-zinc-950 font-medium px-3 py-1.5"
-          >
-            Crear bono
-          </button>
+      <li
+        className="rounded-2xl flex items-center justify-between gap-3 px-4 py-3"
+        style={{ border: '1.5px dashed #e4e4e7', background: '#fafafa' }}
+      >
+        <div>
+          <span className="font-semibold text-sm" style={{ color: '#09090F' }}>{alumno.nombre}</span>
+          <p className="text-xs mt-0.5" style={{ color: '#a1a1aa' }}>Sin bono activo</p>
         </div>
+        <button
+          onClick={onCrearBono}
+          className="text-xs font-bold px-3 py-1.5 rounded-xl shrink-0"
+          style={{ background: '#09090F', color: '#E8A020' }}
+        >
+          Crear bono
+        </button>
       </li>
     );
   }
 
   const estado = estadoEfectivoBono(bono);
   const restantes = clasesRestantes(bono);
+  const pct = bono.clasesContratadas > 0
+    ? Math.round((bono.clasesConsumidas / bono.clasesContratadas) * 100)
+    : 0;
 
-  const badgeClass =
+  const fechaInicioStr = bono.fechaInicio.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  const fechaFinStr = bono.fechaFin.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const badgeStyle =
     estado === 'activo'
-      ? 'bg-emerald-50 text-emerald-700'
+      ? { background: '#09090F', color: '#E8A020' }
       : estado === 'agotado'
-      ? 'bg-amber-50 text-amber-700'
-      : 'bg-red-50 text-red-700';
+      ? { background: '#E8A02015', color: '#92400e' }
+      : { background: '#C0481015', color: '#C04810' };
 
-  const badgeLabel = estado === 'activo' ? 'Activo' : estado === 'agotado' ? 'Agotado' : 'Caducado';
-
-  const fechaInicioStr = bono.fechaInicio.toDate().toLocaleDateString('es-ES');
-  const fechaFinStr = bono.fechaFin.toDate().toLocaleDateString('es-ES');
+  const barColor = estado !== 'activo' ? '#C04810' : restantes <= 1 ? '#E8A020' : '#16a34a';
 
   return (
-    <li className="p-4 flex items-center justify-between gap-3 flex-wrap">
-      <div className="min-w-0">
-        <span className="font-medium text-zinc-900">{alumno.nombre}</span>
-        <div className="text-xs text-zinc-500 mt-0.5">
-          {bono.clasesConsumidas}/{bono.clasesContratadas} clases usadas · {restantes} restantes ·{' '}
-          {bono.precio.toFixed(2)} €
+    <li
+      className="rounded-2xl overflow-hidden"
+      style={{ border: `1.5px solid ${estado === 'activo' ? '#e4e4e7' : estado === 'agotado' ? '#E8A02040' : '#C0481030'}` }}
+    >
+      <div className="flex items-center gap-0">
+        {/* Barra lateral de estado */}
+        <div className="w-1 self-stretch shrink-0" style={{ background: barColor }} />
+
+        <div className="flex flex-1 flex-col gap-2 px-4 py-3 bg-white min-w-0">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-sm" style={{ color: '#09090F' }}>{alumno.nombre}</span>
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+                style={badgeStyle}
+              >
+                {estado === 'activo' ? 'Activo' : estado === 'agotado' ? 'Agotado' : 'Caducado'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => onEditarBono(bono)}
+                className="text-xs font-medium px-2.5 py-1 rounded-lg border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                style={{ color: '#353542' }}
+              >
+                Editar
+              </button>
+              {(estado === 'agotado' || estado === 'caducado') && (
+                <button
+                  onClick={onCrearBono}
+                  className="text-xs font-bold px-2.5 py-1 rounded-lg transition-colors"
+                  style={{ background: '#09090F', color: '#E8A020' }}
+                >
+                  Renovar
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Barra de progreso */}
+          <div>
+            <div className="flex justify-between text-[11px] mb-1" style={{ color: '#a1a1aa' }}>
+              <span>{bono.clasesConsumidas}/{bono.clasesContratadas} clases · <strong style={{ color: '#09090F' }}>{restantes} restantes</strong></span>
+              <span>{bono.precio.toFixed(2)} €</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#f4f4f5' }}>
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${pct}%`, background: barColor }}
+              />
+            </div>
+            <p className="text-[10px] mt-1" style={{ color: '#a1a1aa' }}>
+              {fechaInicioStr} – {fechaFinStr}
+            </p>
+          </div>
         </div>
-        <div className="text-xs text-zinc-400 mt-0.5">
-          {fechaInicioStr} – {fechaFinStr}
-        </div>
-      </div>
-      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-        <span className={['text-xs px-2 py-0.5 rounded-full font-medium', badgeClass].join(' ')}>
-          {badgeLabel}
-        </span>
-        <button
-          onClick={() => onEditarBono(bono)}
-          className="text-xs rounded border px-3 py-1.5 text-zinc-700 hover:bg-zinc-50"
-        >
-          Editar
-        </button>
-        {(estado === 'agotado' || estado === 'caducado') && (
-          <button
-            onClick={onCrearBono}
-            className="text-xs rounded bg-amber-500 hover:bg-amber-600 text-zinc-950 font-medium px-3 py-1.5"
-          >
-            Renovar
-          </button>
-        )}
       </div>
     </li>
   );
@@ -347,16 +406,18 @@ function CrearBonoModal({
     }
   }
 
+  const modalStyle = { background: '#F4EFE6', borderRadius: '20px 20px 0 0', boxShadow: '0 -4px 40px rgba(9,9,15,0.18)' };
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Nuevo bono · {alumno.nombre}</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">
-            ×
-          </button>
+    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" style={{ backgroundColor: 'rgba(9,9,15,0.6)', backdropFilter: 'blur(2px)' }}>
+      <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto flex flex-col" style={modalStyle}>
+        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ background: '#09090F' }}>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: '#E8A02080' }}>Nuevo bono</p>
+            <h2 className="text-base font-bold text-white">{alumno.nombre}</h2>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 text-lg">×</button>
         </div>
-
+        <div className="px-5 py-5">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Clases contratadas">
@@ -367,7 +428,7 @@ function CrearBonoModal({
                 value={clasesContratadas}
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => setClasesContratadas(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
               />
             </Field>
             <Field label="Precio (€)">
@@ -379,7 +440,7 @@ function CrearBonoModal({
                 value={precio}
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => setPrecio(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
               />
             </Field>
             <Field label="Fecha inicio">
@@ -387,7 +448,7 @@ function CrearBonoModal({
                 type="date"
                 value={fechaInicio}
                 onChange={(e) => setFechaInicio(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
               />
             </Field>
             <Field label="Fecha fin">
@@ -395,7 +456,7 @@ function CrearBonoModal({
                 type="date"
                 value={fechaFin}
                 onChange={(e) => setFechaFin(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
               />
             </Field>
           </div>
@@ -415,7 +476,7 @@ function CrearBonoModal({
               <select
                 value={metodoPago}
                 onChange={(e) => setMetodoPago(e.target.value as MetodoPago)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
               >
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
@@ -430,7 +491,7 @@ function CrearBonoModal({
           <button
             type="submit"
             disabled={submitting}
-            className="rounded bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-zinc-950 font-medium px-4 py-2 text-sm"
+            className="text-sm font-bold px-4 py-2.5 rounded-xl disabled:opacity-60 transition-colors" style={{ background: '#09090F', color: '#E8A020' }}
           >
             {submitting ? 'Creando…' : 'Crear bono'}
           </button>
@@ -476,14 +537,16 @@ function RegistrarPagoModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-sm w-full">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Registrar pago · {alumno.nombre}</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">
-            ×
-          </button>
+    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" style={{ backgroundColor: 'rgba(9,9,15,0.6)', backdropFilter: 'blur(2px)' }}>
+      <div className="w-full sm:max-w-sm max-h-[92vh] overflow-y-auto flex flex-col" style={{ background: '#F4EFE6', borderRadius: '20px 20px 0 0', boxShadow: '0 -4px 40px rgba(9,9,15,0.18)' }}>
+        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ background: '#09090F' }}>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: '#E8A02080' }}>Registrar pago</p>
+            <h2 className="text-base font-bold text-white">{alumno.nombre}</h2>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 text-lg">×</button>
         </div>
+        <div className="px-5 py-5">
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Field label="Importe (€)">
@@ -495,14 +558,14 @@ function RegistrarPagoModal({
               value={importe}
               onFocus={(e) => e.target.select()}
               onChange={(e) => setImporte(e.target.value)}
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
             />
           </Field>
           <Field label="Método de pago">
             <select
               value={metodo}
               onChange={(e) => setMetodo(e.target.value as MetodoPago)}
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
             >
               <option value="efectivo">Efectivo</option>
               <option value="transferencia">Transferencia</option>
@@ -516,11 +579,12 @@ function RegistrarPagoModal({
           <button
             type="submit"
             disabled={submitting}
-            className="rounded bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-zinc-950 font-medium px-4 py-2 text-sm"
+            className="text-sm font-bold px-4 py-2.5 rounded-xl disabled:opacity-60 transition-colors" style={{ background: '#09090F', color: '#E8A020' }}
           >
             {submitting ? 'Guardando…' : 'Registrar pago'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );
@@ -531,33 +595,83 @@ function PagoRow({
   nombreAlumno,
   onEditar,
   onBorrar,
+  esUltimo,
 }: {
   pago: PagoDoc;
   nombreAlumno: string;
   onEditar: () => void;
   onBorrar: () => void;
+  esUltimo?: boolean;
 }) {
-  const fechaStr = pago.fecha?.toDate ? pago.fecha.toDate().toLocaleDateString('es-ES') : '';
+  const [confirmando, setConfirmando] = useState(false);
+  const fechaStr = pago.fecha?.toDate
+    ? pago.fecha.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })
+    : '';
+
+  const metodoLabel: Record<string, string> = {
+    efectivo: 'Efectivo',
+    transferencia: 'Transf.',
+    bizum: 'Bizum',
+    otro: 'Otro',
+  };
 
   return (
-    <li className="p-3 flex items-center justify-between text-sm gap-2 flex-wrap">
-      <div className="min-w-0">
-        <span className="font-medium text-zinc-900">{nombreAlumno}</span>
-        <span className="text-zinc-500 ml-2 block sm:inline text-xs sm:text-sm">
-          {pago.tipo === 'bono' ? 'Bono' : 'Clase suelta'} · {pago.metodo}
-          {fechaStr ? ` · ${fechaStr}` : ''}
-        </span>
+    <li
+      className="flex items-center justify-between gap-2 px-4 py-3 bg-white flex-wrap"
+      style={{ borderBottom: esUltimo ? 'none' : '1px solid #f4f4f5' }}
+    >
+      <div className="min-w-0 flex items-center gap-3">
+        <div
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ background: pago.tipo === 'bono' ? '#E8A020' : '#09090F' }}
+        />
+        <div className="min-w-0">
+          <span className="text-sm font-semibold" style={{ color: '#09090F' }}>{nombreAlumno}</span>
+          <span className="text-xs ml-2" style={{ color: '#a1a1aa' }}>
+            {pago.tipo === 'bono' ? 'Bono' : 'Suelta'} · {metodoLabel[pago.metodo] || pago.metodo}
+            {fechaStr ? ` · ${fechaStr}` : ''}
+          </span>
+        </div>
       </div>
-      <div className="flex items-center gap-3 shrink-0">
-        <span className="font-medium text-zinc-900">{pago.importe.toFixed(2)} €</span>
-        {pago.tipo === 'suelta' && (
-          <button onClick={onEditar} className="text-xs text-zinc-600 hover:underline">
-            Editar
-          </button>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-sm font-bold" style={{ color: '#09090F' }}>{pago.importe.toFixed(2)} €</span>
+        {!confirmando ? (
+          <>
+            {pago.tipo === 'suelta' && (
+              <button
+                onClick={onEditar}
+                className="text-xs px-2 py-1 rounded-lg border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                style={{ color: '#353542' }}
+              >
+                Editar
+              </button>
+            )}
+            <button
+              onClick={() => setConfirmando(true)}
+              className="text-xs px-2 py-1 rounded-lg transition-colors hover:bg-red-50"
+              style={{ color: '#C04810' }}
+            >
+              Borrar
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => setConfirmando(false)}
+              className="text-xs px-2 py-1 rounded-lg border border-zinc-200"
+              style={{ color: '#71717a' }}
+            >
+              No
+            </button>
+            <button
+              onClick={() => { setConfirmando(false); onBorrar(); }}
+              className="text-xs px-2 py-1 rounded-lg font-semibold"
+              style={{ background: '#C04810', color: 'white' }}
+            >
+              Sí, borrar
+            </button>
+          </>
         )}
-        <button onClick={onBorrar} className="text-xs text-red-600 hover:underline">
-          Borrar
-        </button>
       </div>
     </li>
   );
@@ -602,16 +716,18 @@ function EditarBonoModal({
     }
   }
 
+  const modalStyle = { background: '#F4EFE6', borderRadius: '20px 20px 0 0', boxShadow: '0 -4px 40px rgba(9,9,15,0.18)' };
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Editar bono · {alumnoNombre}</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">
-            ×
-          </button>
+    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" style={{ backgroundColor: 'rgba(9,9,15,0.6)', backdropFilter: 'blur(2px)' }}>
+      <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto flex flex-col" style={modalStyle}>
+        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ background: '#09090F' }}>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: '#E8A02080' }}>Editar bono</p>
+            <h2 className="text-base font-bold text-white">{alumnoNombre}</h2>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 text-lg">×</button>
         </div>
-
+        <div className="px-5 py-5">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Clases contratadas">
@@ -622,7 +738,7 @@ function EditarBonoModal({
                 value={clasesContratadas}
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => setClasesContratadas(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
               />
             </Field>
             <Field label="Clases consumidas">
@@ -633,7 +749,7 @@ function EditarBonoModal({
                 value={clasesConsumidas}
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => setClasesConsumidas(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
               />
             </Field>
             <Field label="Precio (€)">
@@ -645,7 +761,7 @@ function EditarBonoModal({
                 value={precio}
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => setPrecio(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
               />
             </Field>
             <Field label="Fecha inicio">
@@ -653,7 +769,7 @@ function EditarBonoModal({
                 type="date"
                 value={fechaInicio}
                 onChange={(e) => setFechaInicio(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
               />
             </Field>
             <Field label="Fecha fin">
@@ -661,7 +777,7 @@ function EditarBonoModal({
                 type="date"
                 value={fechaFin}
                 onChange={(e) => setFechaFin(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
               />
             </Field>
           </div>
@@ -671,16 +787,17 @@ function EditarBonoModal({
             de estos valores al guardar.
           </p>
 
-          {error && <div className="text-sm bg-red-50 text-red-700 rounded px-3 py-2">{error}</div>}
+          {error && <div className="text-sm rounded-xl px-4 py-3 mb-1" style={{ background: '#C0481015', color: '#C04810' }}>{error}</div>}
 
           <button
             type="submit"
             disabled={submitting}
-            className="rounded bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-zinc-950 font-medium px-4 py-2 text-sm"
+            className="text-sm font-bold px-4 py-2.5 rounded-xl disabled:opacity-60 transition-colors" style={{ background: '#09090F', color: '#E8A020' }}
           >
             {submitting ? 'Guardando…' : 'Guardar cambios'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );
@@ -717,14 +834,16 @@ function EditarPagoModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-sm w-full">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Editar pago · {alumnoNombre}</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">
-            ×
-          </button>
+    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" style={{ backgroundColor: 'rgba(9,9,15,0.6)', backdropFilter: 'blur(2px)' }}>
+      <div className="w-full sm:max-w-sm max-h-[92vh] overflow-y-auto flex flex-col" style={{ background: '#F4EFE6', borderRadius: '20px 20px 0 0', boxShadow: '0 -4px 40px rgba(9,9,15,0.18)' }}>
+        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ background: '#09090F' }}>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: '#E8A02080' }}>Editar pago</p>
+            <h2 className="text-base font-bold text-white">{alumnoNombre}</h2>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 text-lg">×</button>
         </div>
+        <div className="px-5 py-5">
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Field label="Importe (€)">
@@ -736,14 +855,14 @@ function EditarPagoModal({
               value={importe}
               onFocus={(e) => e.target.select()}
               onChange={(e) => setImporte(e.target.value)}
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
             />
           </Field>
           <Field label="Método de pago">
             <select
               value={metodo}
               onChange={(e) => setMetodo(e.target.value as MetodoPago)}
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-zinc-400"
             >
               <option value="efectivo">Efectivo</option>
               <option value="transferencia">Transferencia</option>
@@ -752,16 +871,17 @@ function EditarPagoModal({
             </select>
           </Field>
 
-          {error && <div className="text-sm bg-red-50 text-red-700 rounded px-3 py-2">{error}</div>}
+          {error && <div className="text-sm rounded-xl px-4 py-3 mb-1" style={{ background: '#C0481015', color: '#C04810' }}>{error}</div>}
 
           <button
             type="submit"
             disabled={submitting}
-            className="rounded bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-zinc-950 font-medium px-4 py-2 text-sm"
+            className="text-sm font-bold px-4 py-2.5 rounded-xl disabled:opacity-60 transition-colors" style={{ background: '#09090F', color: '#E8A020' }}
           >
             {submitting ? 'Guardando…' : 'Guardar cambios'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );
