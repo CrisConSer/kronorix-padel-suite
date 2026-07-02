@@ -37,6 +37,11 @@ export default function AlumnosPage() {
   const [loadingAlumnos, setLoadingAlumnos] = useState(true);
   const [filtro, setFiltro] = useState<'activos' | 'todos'>('activos');
 
+  // Filtros locales (no requieren nueva query a Firestore)
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroTag, setFiltroTag] = useState<string>(''); // tagId o ''
+  const [filtroModalidad, setFiltroModalidad] = useState<string>(''); // 'bono'|'suelta'|''
+
   const [tags, setTags] = useState<TagDoc[]>([]);
   const [editando, setEditando] = useState<AlumnoDoc | null>(null);
   const [mostrarGestorTags, setMostrarGestorTags] = useState(false);
@@ -47,6 +52,17 @@ export default function AlumnosPage() {
     tags.forEach((t) => map.set(t.tagId, t));
     return map;
   }, [tags]);
+
+  // Alumnos filtrados localmente (búsqueda + tag + modalidad)
+  const alumnosFiltrados = useMemo(() => {
+    const q = busqueda.toLowerCase().trim();
+    return alumnos.filter((a) => {
+      if (q && !a.nombre.toLowerCase().includes(q) && !(a.email || '').toLowerCase().includes(q)) return false;
+      if (filtroTag && !(a.tagsIds || []).includes(filtroTag)) return false;
+      if (filtroModalidad && a.modalidad !== filtroModalidad) return false;
+      return true;
+    });
+  }, [alumnos, busqueda, filtroTag, filtroModalidad]);
 
   // Alumnos
   useEffect(() => {
@@ -91,35 +107,40 @@ export default function AlumnosPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-3 sm:p-6 space-y-8">
+    <div className="max-w-4xl mx-auto p-3 sm:p-6 space-y-6">
+      {/* ── HEADER ── */}
       <header className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">Alumnos</h1>
-          <p className="text-sm text-zinc-600 mt-1">Altas, bajas y datos de tus alumnos.</p>
+          <h1 className="text-[26px] font-bold tracking-tight" style={{ color: '#09090F' }}>Alumnos</h1>
+          <p className="text-sm mt-0.5" style={{ color: '#71717a' }}>Altas, bajas y datos de tus alumnos.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setMostrarGestorTags(true)}
-            className="text-sm rounded border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-zinc-50"
+            className="text-xs font-semibold px-3 py-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors"
+            style={{ color: '#353542' }}
           >
             Gestionar tags
           </button>
-          <div className="inline-flex rounded border border-zinc-300 overflow-hidden text-sm">
+          {/* Toggle activos/todos */}
+          <div className="flex rounded-xl p-1 gap-1" style={{ background: '#09090F' }}>
             <button
               onClick={() => setFiltro('activos')}
-              className={[
-                'px-3 py-1.5',
-                filtro === 'activos' ? 'bg-amber-500 text-zinc-950 font-medium' : 'bg-white text-zinc-600',
-              ].join(' ')}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+              style={{
+                background: filtro === 'activos' ? '#E8A020' : 'transparent',
+                color: filtro === 'activos' ? '#09090F' : '#F4EFE660',
+              }}
             >
               Activos
             </button>
             <button
               onClick={() => setFiltro('todos')}
-              className={[
-                'px-3 py-1.5',
-                filtro === 'todos' ? 'bg-amber-500 text-zinc-950 font-medium' : 'bg-white text-zinc-600',
-              ].join(' ')}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+              style={{
+                background: filtro === 'todos' ? '#E8A020' : 'transparent',
+                color: filtro === 'todos' ? '#09090F' : '#F4EFE660',
+              }}
             >
               Todos
             </button>
@@ -127,29 +148,105 @@ export default function AlumnosPage() {
         </div>
       </header>
 
-      <div className="border border-zinc-200 rounded p-5 bg-white">
-        <AlumnoForm
-          tenantId={tenantId!}
-          createdBy={user.uid}
-          tags={tags}
-          modo="crear"
-          onDone={() => {}}
-        />
+      {/* ── FORMULARIO NUEVO ALUMNO (colapsable) ── */}
+      <NuevoAlumnoPanel tenantId={tenantId!} createdBy={user.uid} tags={tags} />
+
+      {/* ── BUSCADOR Y FILTROS ── */}
+      <div className="space-y-3">
+        {/* Buscador */}
+        <div className="relative">
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          </svg>
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre o email…"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 bg-white text-sm outline-none focus:border-zinc-400 transition-colors"
+          />
+          {busqueda && (
+            <button
+              onClick={() => setBusqueda('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        {/* Filtros por tag y modalidad */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#a1a1aa' }}>Filtrar:</span>
+
+          {/* Tags */}
+          {tags.map((t) => (
+            <button
+              key={t.tagId}
+              onClick={() => setFiltroTag(filtroTag === t.tagId ? '' : t.tagId)}
+              className="text-xs font-semibold px-2.5 py-1 rounded-full transition-all"
+              style={
+                filtroTag === t.tagId
+                  ? { background: t.color, color: '#fff' }
+                  : { background: `${t.color}18`, color: t.color, border: `1.5px solid ${t.color}40` }
+              }
+            >
+              {t.nombre}
+            </button>
+          ))}
+
+          {/* Modalidad */}
+          {(['bono', 'suelta'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setFiltroModalidad(filtroModalidad === m ? '' : m)}
+              className="text-xs font-semibold px-2.5 py-1 rounded-full transition-all border"
+              style={
+                filtroModalidad === m
+                  ? { background: '#09090F', color: '#E8A020', borderColor: '#09090F' }
+                  : { background: 'white', color: '#353542', borderColor: '#e4e4e7' }
+              }
+            >
+              {m === 'bono' ? 'Bono' : 'Suelta'}
+            </button>
+          ))}
+
+          {/* Reset */}
+          {(filtroTag || filtroModalidad) && (
+            <button
+              onClick={() => { setFiltroTag(''); setFiltroModalidad(''); }}
+              className="text-xs text-zinc-400 hover:text-zinc-700 underline"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* ── LISTADO ── */}
       <section>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-3">
-          Listado {filtro === 'activos' ? '(activos)' : '(todos)'}
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-bold tracking-widest uppercase" style={{ color: '#353542' }}>
+            {filtro === 'activos' ? 'Activos' : 'Todos'}
+          </h2>
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: '#09090F', color: '#E8A020' }}>
+            {alumnosFiltrados.length}
+          </span>
+        </div>
+
         {loadingAlumnos ? (
           <p className="text-sm text-zinc-500">Cargando alumnos…</p>
-        ) : alumnos.length === 0 ? (
-          <p className="text-sm text-zinc-500">
-            {filtro === 'activos' ? 'No tienes alumnos activos todavía.' : 'No tienes alumnos registrados.'}
-          </p>
+        ) : alumnosFiltrados.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-zinc-300 py-10 text-center">
+            <p className="text-sm text-zinc-400">
+              {alumnos.length === 0
+                ? filtro === 'activos' ? 'No tienes alumnos activos todavía.' : 'No tienes alumnos registrados.'
+                : 'No hay alumnos que coincidan con los filtros.'}
+            </p>
+          </div>
         ) : (
-          <ul className="divide-y divide-zinc-200 rounded border border-zinc-200 bg-white">
-            {alumnos.map((a) => (
+          <ul className="space-y-2">
+            {alumnosFiltrados.map((a) => (
               <AlumnoRow
                 key={a.alumnoId}
                 alumno={a}
@@ -183,6 +280,61 @@ export default function AlumnosPage() {
   );
 }
 
+/**
+ * Panel de nuevo alumno: colapsado por defecto, se expande al pulsar.
+ * Evita que el formulario ocupe espacio visual cuando el profesor solo
+ * quiere buscar o gestionar alumnos existentes.
+ */
+function NuevoAlumnoPanel({
+  tenantId,
+  createdBy,
+  tags,
+}: {
+  tenantId: string;
+  createdBy: string;
+  tags: TagDoc[];
+}) {
+  const [abierto, setAbierto] = useState(false);
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden transition-all"
+      style={{ border: abierto ? '1.5px solid #09090F' : '1.5px dashed #E8A02070', background: abierto ? 'white' : '#F4EFE6' }}
+    >
+      <button
+        onClick={() => setAbierto((v) => !v)}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors"
+      >
+        <span
+          className="w-7 h-7 flex items-center justify-center rounded-full text-base font-bold shrink-0 transition-transform"
+          style={{
+            background: '#E8A020',
+            color: '#09090F',
+            transform: abierto ? 'rotate(45deg)' : 'none',
+          }}
+        >
+          +
+        </span>
+        <span className="text-sm font-semibold" style={{ color: '#353542' }}>
+          {abierto ? 'Cerrar formulario' : 'Añadir nuevo alumno'}
+        </span>
+      </button>
+
+      {abierto && (
+        <div className="px-5 pb-5 pt-1 border-t border-zinc-100">
+          <AlumnoForm
+            tenantId={tenantId}
+            createdBy={createdBy}
+            tags={tags}
+            modo="crear"
+            onDone={() => setAbierto(false)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AlumnoRow({
   alumno,
   tenantId,
@@ -198,14 +350,16 @@ function AlumnoRow({
   const [invitando, setInvitando] = useState(false);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
+  const [confirmandoBaja, setConfirmandoBaja] = useState(false);
+
   const modalidadLabel: Record<ModalidadAlumno, string> = {
-    bono: 'Bono mensual',
-    suelta: 'Clase suelta',
+    bono: 'Bono',
+    suelta: 'Suelta',
   };
 
   async function darBaja() {
-    if (!confirm(`¿Dar de baja a ${alumno.nombre}? Podrás verlo igual en "Todos".`)) return;
     setWorking(true);
+    setConfirmandoBaja(false);
     try {
       await updateDoc(doc(db, 'tenants', tenantId, 'alumnos', alumno.alumnoId), {
         estado: 'baja',
@@ -213,7 +367,6 @@ function AlumnoRow({
       });
     } catch (e) {
       console.error('Error dando de baja:', e);
-      alert('No se pudo dar de baja. Inténtalo de nuevo.');
     } finally {
       setWorking(false);
     }
@@ -262,73 +415,133 @@ function AlumnoRow({
     .map((id) => tagsPorId.get(id))
     .filter((t): t is TagDoc => !!t);
 
+  const esBaja = alumno.estado === 'baja';
+
   return (
-    <li className="p-4 flex items-center justify-between gap-3 flex-wrap">
-      <div className="min-w-0">
-        <div className="font-medium text-zinc-900 flex items-center gap-2 flex-wrap">
-          {alumno.nombre}
-          {alumno.estado === 'baja' && (
-            <span className="text-xs bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">de baja</span>
-          )}
-          {tagsDelAlumno.map((t) => (
-            <span
-              key={t.tagId}
-              className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ backgroundColor: `${t.color}22`, color: t.color }}
-            >
-              {t.nombre}
-            </span>
-          ))}
+    <li
+      className="rounded-2xl overflow-hidden transition-all"
+      style={{
+        border: esBaja ? '1.5px solid #e4e4e7' : '1.5px solid #e4e4e7',
+        background: esBaja ? '#fafafa' : 'white',
+        opacity: esBaja ? 0.7 : 1,
+      }}
+    >
+      <div className="flex items-center gap-0">
+        {/* Franja de color del tag principal */}
+        <div
+          className="w-1 self-stretch shrink-0"
+          style={{ background: tagsDelAlumno[0]?.color || '#e4e4e7' }}
+        />
+
+        <div className="flex flex-1 items-center justify-between gap-3 px-4 py-3 flex-wrap min-w-0">
+          {/* Info */}
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-sm" style={{ color: esBaja ? '#a1a1aa' : '#09090F' }}>
+                {alumno.nombre}
+              </span>
+              {esBaja && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-400 uppercase tracking-wide">
+                  De baja
+                </span>
+              )}
+              {/* Tags */}
+              {tagsDelAlumno.map((t) => (
+                <span
+                  key={t.tagId}
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+                  style={{ background: `${t.color}18`, color: t.color, border: `1px solid ${t.color}30` }}
+                >
+                  {t.nombre}
+                </span>
+              ))}
+              {/* Modalidad */}
+              <span
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                style={{ borderColor: '#e4e4e7', color: '#71717a' }}
+              >
+                {modalidadLabel[alumno.modalidad]}
+              </span>
+            </div>
+
+            <div className="text-xs flex items-center gap-1.5 flex-wrap" style={{ color: '#a1a1aa' }}>
+              {alumno.email && <span>{alumno.email}</span>}
+              {alumno.email && alumno.telefono && <span>·</span>}
+              {alumno.telefono && <span>{alumno.telefono}</span>}
+              {alumno.nivel && <><span>·</span><span>{alumno.nivel}</span></>}
+            </div>
+
+            <div className="text-xs flex items-center gap-1.5">
+              {alumno.uid ? (
+                <span className="font-medium" style={{ color: '#16a34a' }}>✓ Acceso activo</span>
+              ) : (
+                <span style={{ color: '#a1a1aa' }}>Sin acceso a la app</span>
+              )}
+              {inviteFeedback && (
+                <span style={{ color: '#71717a' }}>· {inviteFeedback}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Acciones */}
+          <div className="shrink-0 flex items-center gap-1.5 flex-wrap">
+            {confirmandoBaja ? (
+              <>
+                <button
+                  onClick={() => setConfirmandoBaja(false)}
+                  className="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-200 text-zinc-500"
+                >
+                  No
+                </button>
+                <button
+                  onClick={darBaja}
+                  disabled={working}
+                  className="text-xs px-2.5 py-1.5 rounded-lg font-semibold disabled:opacity-50"
+                  style={{ background: '#C04810', color: 'white' }}
+                >
+                  Sí, dar de baja
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleInvitar}
+                  disabled={invitando}
+                  className="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-200 font-medium disabled:opacity-50 hover:bg-zinc-50 transition-colors"
+                  style={{ color: '#92400e' }}
+                >
+                  {invitando ? '…' : alumno.uid ? 'Reenviar' : 'Invitar'}
+                </button>
+                <button
+                  onClick={onEditar}
+                  className="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-200 font-medium hover:bg-zinc-50 transition-colors"
+                  style={{ color: '#353542' }}
+                >
+                  Editar
+                </button>
+                {esBaja ? (
+                  <button
+                    onClick={reactivar}
+                    disabled={working}
+                    className="text-xs px-2.5 py-1.5 rounded-lg font-semibold disabled:opacity-50 transition-colors"
+                    style={{ background: '#09090F', color: '#E8A020' }}
+                  >
+                    Reactivar
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setConfirmandoBaja(true)}
+                    disabled={working}
+                    className="text-xs px-2.5 py-1.5 rounded-lg border font-medium disabled:opacity-50 transition-colors hover:bg-red-50"
+                    style={{ borderColor: '#fca5a5', color: '#C04810' }}
+                  >
+                    Baja
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
-        <div className="text-xs text-zinc-500 mt-0.5">
-          {modalidadLabel[alumno.modalidad]}
-          {alumno.email ? ` · ${alumno.email}` : ''}
-          {alumno.telefono ? ` · ${alumno.telefono}` : ''}
-          {alumno.nivel ? ` · Nivel: ${alumno.nivel}` : ''}
-        </div>
-        {alumno.notas && (
-          <div className="text-xs text-zinc-400 mt-1 italic truncate">{alumno.notas}</div>
-        )}
-        <div className="text-xs mt-1 flex items-center gap-2 flex-wrap">
-          {alumno.uid ? (
-            <span className="text-emerald-700">✓ Tiene acceso a la app</span>
-          ) : (
-            <span className="text-zinc-400">Sin acceso a la app todavía</span>
-          )}
-          {inviteFeedback && <span className="text-zinc-500">· {inviteFeedback}</span>}
-        </div>
-      </div>
-      <div className="shrink-0 flex items-center gap-2">
-        <button
-          onClick={handleInvitar}
-          disabled={invitando}
-          className="text-xs rounded border px-3 py-1.5 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
-        >
-          {invitando ? 'Enviando…' : alumno.uid ? 'Reenviar invitación' : 'Invitar'}
-        </button>
-        <button
-          onClick={onEditar}
-          className="text-xs rounded border px-3 py-1.5 text-zinc-700 hover:bg-zinc-50"
-        >
-          Editar
-        </button>
-        {alumno.estado === 'activo' ? (
-          <button
-            onClick={darBaja}
-            disabled={working}
-            className="text-xs rounded border px-3 py-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50"
-          >
-            Dar de baja
-          </button>
-        ) : (
-          <button
-            onClick={reactivar}
-            disabled={working}
-            className="text-xs rounded border px-3 py-1.5 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
-          >
-            Reactivar
-          </button>
-        )}
       </div>
     </li>
   );
@@ -554,11 +767,12 @@ function AlumnoForm({
         </div>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pt-2">
         <button
           type="submit"
           disabled={submitting || !puedeEnviar}
-          className="rounded bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-zinc-950 font-medium px-4 py-2 text-sm"
+          className="text-sm font-bold px-4 py-2.5 rounded-xl disabled:opacity-60 transition-colors"
+          style={{ background: '#09090F', color: '#E8A020' }}
         >
           {submitting ? 'Guardando…' : modo === 'crear' ? 'Añadir alumno' : 'Guardar cambios'}
         </button>
@@ -566,7 +780,7 @@ function AlumnoForm({
           <button
             type="button"
             onClick={onDone}
-            className="text-sm text-zinc-600 hover:text-zinc-900"
+            className="text-sm text-zinc-500 hover:text-zinc-700"
           >
             Cancelar
           </button>
@@ -588,22 +802,31 @@ function EditarAlumnoModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Editar alumno</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">
-            ×
-          </button>
+    <div
+      className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      style={{ backgroundColor: 'rgba(9,9,15,0.6)', backdropFilter: 'blur(2px)' }}
+    >
+      <div
+        className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto flex flex-col"
+        style={{ background: '#F4EFE6', borderRadius: '20px 20px 0 0', boxShadow: '0 -4px 40px rgba(9,9,15,0.18)' }}
+      >
+        <div
+          className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ background: '#09090F', borderRadius: 'inherit inherit 0 0' }}
+        >
+          <h2 className="text-base font-bold text-white">Editar alumno</h2>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors text-lg">×</button>
         </div>
-        <AlumnoForm
-          tenantId={tenantId}
-          createdBy={alumno.createdBy}
-          tags={tags}
-          modo="editar"
-          alumnoExistente={alumno}
-          onDone={onClose}
-        />
+        <div className="px-5 py-5">
+          <AlumnoForm
+            tenantId={tenantId}
+            createdBy={alumno.createdBy}
+            tags={tags}
+            modo="editar"
+            alumnoExistente={alumno}
+            onDone={onClose}
+          />
+        </div>
       </div>
     </div>
   );
@@ -652,66 +875,87 @@ function GestorTagsModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Gestionar tags</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-xl leading-none">
-            ×
-          </button>
+    <div
+      className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      style={{ backgroundColor: 'rgba(9,9,15,0.6)', backdropFilter: 'blur(2px)' }}
+    >
+      <div
+        className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto flex flex-col"
+        style={{ background: '#F4EFE6', borderRadius: '20px 20px 0 0', boxShadow: '0 -4px 40px rgba(9,9,15,0.18)' }}
+      >
+        <div
+          className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ background: '#09090F' }}
+        >
+          <h2 className="text-base font-bold text-white">Gestionar tags</h2>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors text-lg">×</button>
         </div>
 
-        <form onSubmit={handleCrear} className="flex items-end gap-2 mb-5">
-          <Field label="Nuevo tag">
-            <input
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              className="border rounded px-3 py-2 text-sm w-full"
-              placeholder="Ej. Competición"
-            />
-          </Field>
-          <label className="block">
-            <span className="block text-xs font-medium text-zinc-600 mb-1">Color</span>
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="h-9 w-12 border rounded"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={submitting || !nombre.trim()}
-            className="rounded bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-zinc-950 font-medium px-3 py-2 text-sm"
-          >
-            Crear
-          </button>
-        </form>
+        <div className="px-5 py-5 space-y-4">
+          <form onSubmit={handleCrear} className="flex items-end gap-2">
+            <div className="flex-1">
+              <label className="block text-xs font-semibold uppercase tracking-widest mb-1.5" style={{ color: '#353542' }}>
+                Nuevo tag
+              </label>
+              <input
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:border-zinc-400"
+                placeholder="Ej. Competición"
+              />
+            </div>
+            <label className="block shrink-0">
+              <span className="block text-xs font-semibold uppercase tracking-widest mb-1.5" style={{ color: '#353542' }}>Color</span>
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-9 w-12 border border-zinc-200 rounded-xl cursor-pointer"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={submitting || !nombre.trim()}
+              className="text-sm font-bold px-4 py-2 rounded-xl disabled:opacity-50 transition-colors shrink-0"
+              style={{ background: '#09090F', color: '#E8A020' }}
+            >
+              {submitting ? '…' : 'Crear'}
+            </button>
+          </form>
 
-        {error && <div className="text-sm bg-red-50 text-red-700 rounded px-3 py-2 mb-3">{error}</div>}
+          {error && (
+            <div className="text-sm rounded-xl px-4 py-3" style={{ background: '#C0481015', color: '#C04810' }}>
+              {error}
+            </div>
+          )}
 
-        {tags.length === 0 ? (
-          <p className="text-sm text-zinc-500">No tienes tags creados todavía.</p>
-        ) : (
-          <ul className="space-y-2">
-            {tags.map((t) => (
-              <li key={t.tagId} className="flex items-center justify-between border rounded px-3 py-2">
-                <span
-                  className="text-xs px-2.5 py-1 rounded-full font-medium"
-                  style={{ backgroundColor: `${t.color}22`, color: t.color }}
+          {tags.length === 0 ? (
+            <p className="text-sm text-zinc-400 text-center py-4">No tienes tags creados todavía.</p>
+          ) : (
+            <ul className="space-y-2">
+              {tags.map((t) => (
+                <li
+                  key={t.tagId}
+                  className="flex items-center justify-between rounded-xl px-3 py-2.5 bg-white border border-zinc-200"
                 >
-                  {t.nombre}
-                </span>
-                <button
-                  onClick={() => handleBorrar(t.tagId)}
-                  className="text-xs text-red-600 hover:underline"
-                >
-                  Borrar
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <span
+                    className="text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wide"
+                    style={{ background: `${t.color}18`, color: t.color, border: `1px solid ${t.color}30` }}
+                  >
+                    {t.nombre}
+                  </span>
+                  <button
+                    onClick={() => handleBorrar(t.tagId)}
+                    className="text-xs font-medium px-2.5 py-1 rounded-lg transition-colors hover:bg-red-50"
+                    style={{ color: '#C04810' }}
+                  >
+                    Borrar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );
