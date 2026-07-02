@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useParams } from 'next/navigation';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useSessionUser } from '@/src/useSessionUser';
 import type { AlumnoDoc, ClaseDoc, TagDoc, TipoClase } from '@/src/types';
@@ -40,7 +40,25 @@ import {
 export default function CalendarioPage() {
   const params = useParams<{ tenantSlug: string }>();
   const { user, loading: loadingUser } = useSessionUser();
-  const tenantId = user?.tenantId;
+  // Para super_admin, user.tenantId es el suyo propio, no el del tenant
+  // visitado. Resolvemos el tenantId real desde el slug de la URL.
+  const [tenantId, setTenantId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!user) return;
+    if (user.role !== 'super_admin') {
+      setTenantId(user.tenantId);
+      return;
+    }
+    // Super admin: resolver tenantId desde el slug
+    const q = query(
+      collection(db, 'tenants'),
+      where('slug', '==', params.tenantSlug)
+    );
+    getDocs(q).then((snap) => {
+      if (!snap.empty) setTenantId(snap.docs[0].data().tenantId as string);
+    });
+  }, [user?.role, user?.tenantId, params.tenantSlug]);
 
   const hoy = useMemo(() => new Date(), []);
   const [year, setYear] = useState(hoy.getFullYear());
@@ -60,7 +78,7 @@ export default function CalendarioPage() {
   // de un solo profesor es pequeño y así evitamos índices adicionales
   // por rango de fecha en esta primera versión).
   useEffect(() => {
-    if (!tenantId || user?.role !== 'admin') return;
+    if (!tenantId || (user?.role !== 'admin' && user?.role !== 'super_admin')) return;
     const q = query(collection(db, 'tenants', tenantId, 'clases'), orderBy('fecha'));
     const unsub = onSnapshot(q, (snap) => {
       setClases(snap.docs.map((d) => d.data() as ClaseDoc));
@@ -70,7 +88,7 @@ export default function CalendarioPage() {
   }, [tenantId, user?.role]);
 
   useEffect(() => {
-    if (!tenantId || user?.role !== 'admin') return;
+    if (!tenantId || (user?.role !== 'admin' && user?.role !== 'super_admin')) return;
     const q = query(collection(db, 'tenants', tenantId, 'alumnos'), orderBy('nombre'));
     const unsub = onSnapshot(q, (snap) => {
       setAlumnos(snap.docs.map((d) => d.data() as AlumnoDoc));
@@ -79,7 +97,7 @@ export default function CalendarioPage() {
   }, [tenantId, user?.role]);
 
   useEffect(() => {
-    if (!tenantId || user?.role !== 'admin') return;
+    if (!tenantId || (user?.role !== 'admin' && user?.role !== 'super_admin')) return;
     const q = query(collection(db, 'tenants', tenantId, 'tags'), orderBy('nombre'));
     const unsub = onSnapshot(q, (snap) => {
       setTags(snap.docs.map((d) => d.data() as TagDoc));
@@ -114,7 +132,8 @@ export default function CalendarioPage() {
   const hoyStr = hoyYmd();
 
   if (loadingUser) return <div className="p-6 text-sm text-zinc-500">Cargando…</div>;
-  if (!user || user.role !== 'admin' || user.tenantSlug !== params.tenantSlug) {
+  const isSuperAdmin = user?.role === 'super_admin';
+  if (!user || (!isSuperAdmin && (user.role !== 'admin' || user.tenantSlug !== params.tenantSlug))) {
     return <div className="p-6 text-sm text-red-600">No tienes acceso a esta página.</div>;
   }
 

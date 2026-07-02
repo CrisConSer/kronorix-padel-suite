@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useSessionUser } from '@/src/useSessionUser';
 import type { AlumnoDoc, BonoDoc, ClaseDoc, PagoDoc } from '@/src/types';
@@ -32,7 +32,16 @@ const NOMBRES_DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 export default function DashboardPage() {
   const params = useParams<{ tenantSlug: string }>();
   const { user, loading: loadingUser } = useSessionUser();
-  const tenantId = user?.tenantId;
+
+  // Para super_admin, resolver tenantId desde el slug de la URL.
+  const [tenantId, setTenantId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!user) return;
+    if (user.role !== 'super_admin') { setTenantId(user.tenantId); return; }
+    getDocs(query(collection(db, 'tenants'), where('slug', '==', params.tenantSlug)))
+      .then((snap) => { if (!snap.empty) setTenantId(snap.docs[0].data().tenantId as string); });
+  }, [user?.role, user?.tenantId, params.tenantSlug]);
+
 
   const [alumnos, setAlumnos] = useState<AlumnoDoc[]>([]);
   const [clases, setClases] = useState<ClaseDoc[]>([]);
@@ -41,7 +50,7 @@ export default function DashboardPage() {
   const [loadingDatos, setLoadingDatos] = useState(true);
 
   useEffect(() => {
-    if (!tenantId || user?.role !== 'admin') return;
+    if (!tenantId || (user?.role !== 'admin' && user?.role !== 'super_admin')) return;
     const unsub = onSnapshot(collection(db, 'tenants', tenantId, 'alumnos'), (snap) => {
       setAlumnos(snap.docs.map((d) => d.data() as AlumnoDoc));
     });
@@ -49,7 +58,7 @@ export default function DashboardPage() {
   }, [tenantId, user?.role]);
 
   useEffect(() => {
-    if (!tenantId || user?.role !== 'admin') return;
+    if (!tenantId || (user?.role !== 'admin' && user?.role !== 'super_admin')) return;
     const unsub = onSnapshot(collection(db, 'tenants', tenantId, 'clases'), (snap) => {
       setClases(snap.docs.map((d) => d.data() as ClaseDoc));
       setLoadingDatos(false);
@@ -58,7 +67,7 @@ export default function DashboardPage() {
   }, [tenantId, user?.role]);
 
   useEffect(() => {
-    if (!tenantId || user?.role !== 'admin') return;
+    if (!tenantId || (user?.role !== 'admin' && user?.role !== 'super_admin')) return;
     const unsub = onSnapshot(collection(db, 'tenants', tenantId, 'pagos'), (snap) => {
       setPagos(snap.docs.map((d) => d.data() as PagoDoc));
     });
@@ -66,7 +75,7 @@ export default function DashboardPage() {
   }, [tenantId, user?.role]);
 
   useEffect(() => {
-    if (!tenantId || user?.role !== 'admin') return;
+    if (!tenantId || (user?.role !== 'admin' && user?.role !== 'super_admin')) return;
     const unsub = onSnapshot(collection(db, 'tenants', tenantId, 'bonos'), (snap) => {
       setBonos(snap.docs.map((d) => d.data() as BonoDoc));
     });
@@ -91,7 +100,7 @@ export default function DashboardPage() {
   const bonosVigilar = useMemo(() => bonosAVigilar(alumnos, bonos), [alumnos, bonos]);
 
   if (loadingUser) return <div className="p-6 text-sm text-zinc-500">Cargando…</div>;
-  if (!user || user.role !== 'admin' || user.tenantSlug !== params.tenantSlug) {
+  if (!user || (user.role !== 'super_admin' && (user.role !== 'admin' || user.tenantSlug !== params.tenantSlug))) {
     return <div className="p-6 text-sm text-red-600">No tienes acceso a esta página.</div>;
   }
   if (loadingDatos) return <div className="p-6 text-sm text-zinc-500">Cargando datos…</div>;

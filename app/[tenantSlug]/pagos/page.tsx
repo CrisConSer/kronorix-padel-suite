@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useParams } from 'next/navigation';
-import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useSessionUser } from '@/src/useSessionUser';
 import type { AlumnoDoc, BonoDoc, PagoDoc, MetodoPago } from '@/src/types';
@@ -29,7 +29,16 @@ import {
 export default function PagosPage() {
   const params = useParams<{ tenantSlug: string }>();
   const { user, loading: loadingUser } = useSessionUser();
-  const tenantId = user?.tenantId;
+
+  // Para super_admin, resolver tenantId desde el slug de la URL.
+  const [tenantId, setTenantId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!user) return;
+    if (user.role !== 'super_admin') { setTenantId(user.tenantId); return; }
+    getDocs(query(collection(db, 'tenants'), where('slug', '==', params.tenantSlug)))
+      .then((snap) => { if (!snap.empty) setTenantId(snap.docs[0].data().tenantId as string); });
+  }, [user?.role, user?.tenantId, params.tenantSlug]);
+
 
   const [alumnos, setAlumnos] = useState<AlumnoDoc[]>([]);
   const [bonos, setBonos] = useState<BonoDoc[]>([]);
@@ -47,7 +56,7 @@ export default function PagosPage() {
   const [busquedaHistorial, setBusquedaHistorial] = useState('');
 
   useEffect(() => {
-    if (!tenantId || user?.role !== 'admin') return;
+    if (!tenantId || (user?.role !== 'admin' && user?.role !== 'super_admin')) return;
     const q = query(
       collection(db, 'tenants', tenantId, 'alumnos'),
       where('estado', '==', 'activo'),
@@ -61,7 +70,7 @@ export default function PagosPage() {
   }, [tenantId, user?.role]);
 
   useEffect(() => {
-    if (!tenantId || user?.role !== 'admin') return;
+    if (!tenantId || (user?.role !== 'admin' && user?.role !== 'super_admin')) return;
     const unsub = onSnapshot(collection(db, 'tenants', tenantId, 'bonos'), (snap) => {
       setBonos(snap.docs.map((d) => d.data() as BonoDoc));
     });
@@ -69,7 +78,7 @@ export default function PagosPage() {
   }, [tenantId, user?.role]);
 
   useEffect(() => {
-    if (!tenantId || user?.role !== 'admin') return;
+    if (!tenantId || (user?.role !== 'admin' && user?.role !== 'super_admin')) return;
     const q = query(collection(db, 'tenants', tenantId, 'pagos'), orderBy('fecha', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
       setPagos(snap.docs.map((d) => d.data() as PagoDoc));
@@ -130,7 +139,7 @@ export default function PagosPage() {
   }
 
   if (loadingUser) return <div className="p-6 text-sm text-zinc-500">Cargando…</div>;
-  if (!user || user.role !== 'admin' || user.tenantSlug !== params.tenantSlug) {
+  if (!user || (user.role !== 'super_admin' && (user.role !== 'admin' || user.tenantSlug !== params.tenantSlug))) {
     return <div className="p-6 text-sm text-red-600">No tienes acceso a esta página.</div>;
   }
 
