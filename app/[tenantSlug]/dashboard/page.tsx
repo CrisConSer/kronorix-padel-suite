@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useSessionUser } from '@/src/useSessionUser';
+import { useTenantGuard } from '@/src/useTenantGuard';
 import type { AlumnoDoc, BonoDoc, ClaseDoc, PagoDoc } from '@/src/types';
 import {
   ingresosPorMes,
@@ -31,7 +31,7 @@ const NOMBRES_DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
  */
 export default function DashboardPage() {
   const params = useParams<{ tenantSlug: string }>();
-  const { user, loading: loadingUser } = useSessionUser();
+  const { loading: loadingUser, allowed, user } = useTenantGuard(params.tenantSlug);
 
   // Para super_admin, resolver tenantId desde el slug de la URL.
   const [tenantId, setTenantId] = useState<string | undefined>(undefined);
@@ -100,7 +100,7 @@ export default function DashboardPage() {
   const bonosVigilar = useMemo(() => bonosAVigilar(alumnos, bonos), [alumnos, bonos]);
 
   if (loadingUser) return <div className="p-6 text-sm text-zinc-500">Cargando…</div>;
-  if (!user || (user.role !== 'super_admin' && (user.role !== 'admin' || user.tenantSlug !== params.tenantSlug))) {
+  if (!allowed || !user) {
     return <div className="p-6 text-sm text-red-600">No tienes acceso a esta página.</div>;
   }
   if (loadingDatos) return <div className="p-6 text-sm text-zinc-500">Cargando datos…</div>;

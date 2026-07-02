@@ -5,7 +5,7 @@ import type { FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import { collection, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useSessionUser } from '@/src/useSessionUser';
+import { useTenantGuard } from '@/src/useTenantGuard';
 import type { AlumnoDoc, BonoDoc, PagoDoc, MetodoPago } from '@/src/types';
 import {
   crearBono,
@@ -28,7 +28,7 @@ import {
  */
 export default function PagosPage() {
   const params = useParams<{ tenantSlug: string }>();
-  const { user, loading: loadingUser } = useSessionUser();
+  const { loading: loadingUser, allowed, user } = useTenantGuard(params.tenantSlug);
 
   // Para super_admin, resolver tenantId desde el slug de la URL.
   const [tenantId, setTenantId] = useState<string | undefined>(undefined);
@@ -139,7 +139,7 @@ export default function PagosPage() {
   }
 
   if (loadingUser) return <div className="p-6 text-sm text-zinc-500">Cargando…</div>;
-  if (!user || (user.role !== 'super_admin' && (user.role !== 'admin' || user.tenantSlug !== params.tenantSlug))) {
+  if (!allowed || !user) {
     return <div className="p-6 text-sm text-red-600">No tienes acceso a esta página.</div>;
   }
 

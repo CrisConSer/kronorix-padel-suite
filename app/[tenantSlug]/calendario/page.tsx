@@ -5,7 +5,7 @@ import type { FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import { collection, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useSessionUser } from '@/src/useSessionUser';
+import { useTenantGuard } from '@/src/useTenantGuard';
 import type { AlumnoDoc, ClaseDoc, TagDoc, TipoClase } from '@/src/types';
 import {
   crearClase,
@@ -39,9 +39,9 @@ import {
  */
 export default function CalendarioPage() {
   const params = useParams<{ tenantSlug: string }>();
-  const { user, loading: loadingUser } = useSessionUser();
-  // Para super_admin, user.tenantId es el suyo propio, no el del tenant
-  // visitado. Resolvemos el tenantId real desde el slug de la URL.
+  const { loading: loadingUser, allowed, mode, user } = useTenantGuard(params.tenantSlug);
+
+  // Para super_admin, resolver tenantId desde el slug de la URL.
   const [tenantId, setTenantId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -50,14 +50,8 @@ export default function CalendarioPage() {
       setTenantId(user.tenantId);
       return;
     }
-    // Super admin: resolver tenantId desde el slug
-    const q = query(
-      collection(db, 'tenants'),
-      where('slug', '==', params.tenantSlug)
-    );
-    getDocs(q).then((snap) => {
-      if (!snap.empty) setTenantId(snap.docs[0].data().tenantId as string);
-    });
+    getDocs(query(collection(db, 'tenants'), where('slug', '==', params.tenantSlug)))
+      .then((snap) => { if (!snap.empty) setTenantId(snap.docs[0].data().tenantId as string); });
   }, [user?.role, user?.tenantId, params.tenantSlug]);
 
   const hoy = useMemo(() => new Date(), []);
@@ -132,8 +126,7 @@ export default function CalendarioPage() {
   const hoyStr = hoyYmd();
 
   if (loadingUser) return <div className="p-6 text-sm text-zinc-500">Cargando…</div>;
-  const isSuperAdmin = user?.role === 'super_admin';
-  if (!user || (!isSuperAdmin && (user.role !== 'admin' || user.tenantSlug !== params.tenantSlug))) {
+  if (!allowed || !user) {
     return <div className="p-6 text-sm text-red-600">No tienes acceso a esta página.</div>;
   }
 
