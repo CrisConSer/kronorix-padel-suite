@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { collection, doc, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { crearProfesorYEnviarInvitacion, slugify } from '@/src/crearProfesorClient';
 import type { TenantDoc } from '@/src/types';
@@ -20,6 +20,7 @@ export default function ProfesoresPage() {
   const { user, loading: loadingUser } = useSessionUser();
   const [tenants, setTenants] = useState<TenantDoc[]>([]);
   const [loadingTenants, setLoadingTenants] = useState(true);
+  const [editando, setEditando] = useState<TenantDoc | null>(null);
 
   useEffect(() => {
     if (!user || user.role !== 'super_admin') return;
@@ -69,18 +70,25 @@ export default function ProfesoresPage() {
         ) : (
           <ul className="space-y-2">
             {tenants.map((t) => (
-              <TenantRow key={t.tenantId} tenant={t} />
+              <TenantRow key={t.tenantId} tenant={t} onEditar={() => setEditando(t)} />
             ))}
           </ul>
         )}
       </section>
+
+      {editando && (
+        <EditarProfesorModal
+          tenant={editando}
+          onClose={() => setEditando(null)}
+        />
+      )}
     </div>
   );
 }
 
-function TenantRow({ tenant: t }: { tenant: TenantDoc }) {
+function TenantRow({ tenant: t, onEditar }: { tenant: TenantDoc; onEditar: () => void }) {
   const [working, setWorking] = useState(false);
-  const [confirmando, setConfirmando] = useState<'suspender' | null>(null);
+  const [confirmando, setConfirmando] = useState<'suspender' | 'eliminar' | null>(null);
 
   async function cambiarPlan(nuevoPlan: 'trial' | 'activo' | 'suspendido') {
     setWorking(true);
@@ -91,6 +99,18 @@ function TenantRow({ tenant: t }: { tenant: TenantDoc }) {
       });
     } catch (e) {
       console.error('Error cambiando plan:', e);
+    } finally {
+      setWorking(false);
+      setConfirmando(null);
+    }
+  }
+
+  async function eliminar() {
+    setWorking(true);
+    try {
+      await deleteDoc(doc(db, 'tenants', t.tenantId));
+    } catch (e) {
+      console.error('Error eliminando tenant:', e);
     } finally {
       setWorking(false);
       setConfirmando(null);
@@ -136,15 +156,24 @@ function TenantRow({ tenant: t }: { tenant: TenantDoc }) {
                 <span>{t.email}</span>
               </div>
             </div>
-            <a
-              href={`/${t.slug}/calendario`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-zinc-200 hover:bg-zinc-50 transition-colors shrink-0"
-              style={{ color: '#353542' }}
-            >
-              Ver app ↗
-            </a>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={onEditar}
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                style={{ color: '#353542' }}
+              >
+                Editar
+              </button>
+              <a
+                href={`/${t.slug}/calendario`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                style={{ color: '#353542' }}
+              >
+                Ver app ↗
+              </a>
+            </div>
           </div>
 
           {/* Barra de acciones de plan */}
@@ -184,40 +213,29 @@ function TenantRow({ tenant: t }: { tenant: TenantDoc }) {
               ✓ Activo
             </button>
 
-            {/* Botón Suspender con confirmación */}
+            {/* Botón Suspender / Eliminar */}
             <div className="ml-auto flex items-center gap-2">
-              {confirmando === 'suspender' ? (
+              {confirmando === 'eliminar' ? (
+                <>
+                  <span className="text-[11px]" style={{ color: '#71717a' }}>¿Eliminar definitivamente?</span>
+                  <button onClick={() => setConfirmando(null)} className="text-[11px] px-2 py-1 rounded-lg border border-zinc-200" style={{ color: '#71717a' }}>No</button>
+                  <button onClick={eliminar} disabled={working} className="text-[11px] font-bold px-2 py-1 rounded-lg disabled:opacity-50" style={{ background: '#C04810', color: 'white' }}>Sí, eliminar</button>
+                </>
+              ) : confirmando === 'suspender' ? (
                 <>
                   <span className="text-[11px]" style={{ color: '#71717a' }}>¿Suspender acceso?</span>
-                  <button
-                    onClick={() => setConfirmando(null)}
-                    className="text-[11px] px-2 py-1 rounded-lg border border-zinc-200"
-                    style={{ color: '#71717a' }}
-                  >
-                    No
-                  </button>
-                  <button
-                    onClick={() => cambiarPlan('suspendido')}
-                    disabled={working}
-                    className="text-[11px] font-bold px-2 py-1 rounded-lg disabled:opacity-50"
-                    style={{ background: '#C04810', color: 'white' }}
-                  >
-                    Sí, suspender
-                  </button>
+                  <button onClick={() => setConfirmando(null)} className="text-[11px] px-2 py-1 rounded-lg border border-zinc-200" style={{ color: '#71717a' }}>No</button>
+                  <button onClick={() => cambiarPlan('suspendido')} disabled={working} className="text-[11px] font-bold px-2 py-1 rounded-lg disabled:opacity-50" style={{ background: '#C04810', color: 'white' }}>Sí, suspender</button>
                 </>
               ) : (
-                <button
-                  onClick={() => !t.active ? cambiarPlan('trial') : setConfirmando('suspender')}
-                  disabled={working}
-                  className="text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors disabled:opacity-40"
-                  style={
-                    !t.active
-                      ? { background: '#09090F', color: '#E8A020' }
-                      : { background: '#fee2e2', color: '#C04810' }
-                  }
-                >
-                  {!t.active ? '↩ Reactivar' : 'Suspender'}
-                </button>
+                <>
+                  {!t.active ? (
+                    <button onClick={() => cambiarPlan('trial')} disabled={working} className="text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors disabled:opacity-40" style={{ background: '#09090F', color: '#E8A020' }}>↩ Reactivar</button>
+                  ) : (
+                    <button onClick={() => setConfirmando('suspender')} disabled={working} className="text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors disabled:opacity-40" style={{ background: '#fee2e2', color: '#C04810' }}>Suspender</button>
+                  )}
+                  <button onClick={() => setConfirmando('eliminar')} disabled={working} className="text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors disabled:opacity-40" style={{ background: '#fff0f0', color: '#C04810', border: '1px solid #fca5a5' }}>🗑 Eliminar</button>
+                </>
               )}
             </div>
           </div>
@@ -401,5 +419,121 @@ function Field({
         </span>
       )}
     </label>
+  );
+}
+
+function EditarProfesorModal({
+  tenant: t,
+  onClose,
+}: {
+  tenant: TenantDoc;
+  onClose: () => void;
+}) {
+  const [nombreProfesor, setNombreProfesor] = useState(t.nombreProfesor || '');
+  const [nombreNegocio, setNombreNegocio] = useState(t.nombreNegocio || '');
+  const [email, setEmail] = useState(t.email || '');
+  const [telefono, setTelefono] = useState(t.telefono || '');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await updateDoc(doc(db, 'tenants', t.tenantId), {
+        nombreProfesor: nombreProfesor.trim(),
+        nombreNegocio: nombreNegocio.trim(),
+        email: email.trim(),
+        telefono: telefono.trim() || null,
+      });
+      onClose();
+    } catch (e: any) {
+      setError(e?.message || 'No se pudo guardar.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      style={{ backgroundColor: 'rgba(9,9,15,0.6)', backdropFilter: 'blur(2px)' }}
+    >
+      <div
+        className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto flex flex-col"
+        style={{ background: '#F4EFE6', borderRadius: '20px 20px 0 0', boxShadow: '0 -4px 40px rgba(9,9,15,0.18)' }}
+      >
+        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ background: '#09090F' }}>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: '#E8A02080' }}>Editar profesor</p>
+            <h2 className="text-base font-bold text-white">{t.nombreNegocio}</h2>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 text-lg">×</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-5 py-5 space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Nombre del profesor">
+              <input
+                required
+                value={nombreProfesor}
+                onChange={(e) => setNombreProfesor(e.target.value)}
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none"
+              />
+            </Field>
+            <Field label="Nombre del negocio">
+              <input
+                required
+                value={nombreNegocio}
+                onChange={(e) => setNombreNegocio(e.target.value)}
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none"
+              />
+            </Field>
+            <Field label="Email">
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none"
+              />
+            </Field>
+            <Field label="Teléfono (opcional)">
+              <input
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                className="w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none"
+                placeholder="600 000 000"
+              />
+            </Field>
+          </div>
+
+          <div className="rounded-xl px-3 py-2.5 text-xs" style={{ background: '#E8A02015', color: '#92400e' }}>
+            El slug <span className="font-mono font-bold">/{t.slug}</span> no se puede cambiar desde aquí — modificarlo rompería las URLs existentes.
+          </div>
+
+          {error && (
+            <div className="text-sm rounded-xl px-4 py-3" style={{ background: '#C0481015', color: '#C04810' }}>
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="text-sm font-bold px-4 py-2.5 rounded-xl disabled:opacity-60"
+              style={{ background: '#09090F', color: '#E8A020' }}
+            >
+              {submitting ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+            <button type="button" onClick={onClose} className="text-sm text-zinc-500 hover:text-zinc-700">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
