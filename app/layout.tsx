@@ -14,6 +14,7 @@ export const metadata: Metadata = {
     shortcut: '/favicon.svg',
     apple: '/apple-touch-icon.png',
   },
+  manifest: '/manifest.json',
   openGraph: {
     title: 'Voltek by Kronorix',
     description: 'Gestión inteligente para profesores de pádel',
