@@ -315,8 +315,8 @@ function CrearBonoModal({
   const enUnMes = new Date(hoy);
   enUnMes.setMonth(enUnMes.getMonth() + 1);
 
-  const [clasesContratadas, setClasesContratadas] = useState(8);
-  const [precio, setPrecio] = useState(80);
+  const [clasesContratadas, setClasesContratadas] = useState('8');
+  const [precio, setPrecio] = useState('80');
   const [fechaInicio, setFechaInicio] = useState(hoy.toISOString().slice(0, 10));
   const [fechaFin, setFechaFin] = useState(enUnMes.toISOString().slice(0, 10));
   const [registrarPagoAhora, setRegistrarPagoAhora] = useState(true);
@@ -331,8 +331,8 @@ function CrearBonoModal({
     try {
       await crearBono(tenantId, {
         alumnoId: alumno.alumnoId,
-        clasesContratadas,
-        precio,
+        clasesContratadas: Math.max(1, parseInt(clasesContratadas) || 0),
+        precio: Math.max(0, parseFloat(precio) || 0),
         fechaInicio,
         fechaFin,
         createdBy,
@@ -363,8 +363,10 @@ function CrearBonoModal({
               <input
                 type="number"
                 min={1}
+                inputMode="numeric"
                 value={clasesContratadas}
-                onChange={(e) => setClasesContratadas(Number(e.target.value))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setClasesContratadas(e.target.value)}
                 className="w-full border rounded px-3 py-2 text-sm"
               />
             </Field>
@@ -373,8 +375,10 @@ function CrearBonoModal({
                 type="number"
                 min={0}
                 step={0.01}
+                inputMode="decimal"
                 value={precio}
-                onChange={(e) => setPrecio(Number(e.target.value))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setPrecio(e.target.value)}
                 className="w-full border rounded px-3 py-2 text-sm"
               />
             </Field>
@@ -447,7 +451,7 @@ function RegistrarPagoModal({
   registradoPor: string;
   onClose: () => void;
 }) {
-  const [importe, setImporte] = useState(20);
+  const [importe, setImporte] = useState('20');
   const [metodo, setMetodo] = useState<MetodoPago>('efectivo');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -459,7 +463,7 @@ function RegistrarPagoModal({
     try {
       await registrarPagoSuelto(tenantId, {
         alumnoId: alumno.alumnoId,
-        importe,
+        importe: Math.max(0, parseFloat(importe) || 0),
         metodo,
         registradoPor,
       });
@@ -487,8 +491,10 @@ function RegistrarPagoModal({
               type="number"
               min={0}
               step={0.01}
+              inputMode="decimal"
               value={importe}
-              onChange={(e) => setImporte(Number(e.target.value))}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => setImporte(e.target.value)}
               className="w-full border rounded px-3 py-2 text-sm"
             />
           </Field>
@@ -568,9 +574,9 @@ function EditarBonoModal({
   alumnoNombre: string;
   onClose: () => void;
 }) {
-  const [clasesContratadas, setClasesContratadas] = useState(bono.clasesContratadas);
-  const [clasesConsumidas, setClasesConsumidas] = useState(bono.clasesConsumidas);
-  const [precio, setPrecio] = useState(bono.precio);
+  const [clasesContratadas, setClasesContratadas] = useState(String(bono.clasesContratadas));
+  const [clasesConsumidas, setClasesConsumidas] = useState(String(bono.clasesConsumidas));
+  const [precio, setPrecio] = useState(String(bono.precio));
   const [fechaInicio, setFechaInicio] = useState(bono.fechaInicio.toDate().toISOString().slice(0, 10));
   const [fechaFin, setFechaFin] = useState(bono.fechaFin.toDate().toISOString().slice(0, 10));
   const [submitting, setSubmitting] = useState(false);
@@ -582,9 +588,9 @@ function EditarBonoModal({
     setError(null);
     try {
       await actualizarBono(tenantId, bono.bonoId, {
-        clasesContratadas,
-        clasesConsumidas,
-        precio,
+        clasesContratadas: Math.max(0, parseInt(clasesContratadas) || 0),
+        clasesConsumidas: Math.max(0, parseInt(clasesConsumidas) || 0),
+        precio: Math.max(0, parseFloat(precio) || 0),
         fechaInicio,
         fechaFin,
       });
@@ -612,8 +618,10 @@ function EditarBonoModal({
               <input
                 type="number"
                 min={0}
+                inputMode="numeric"
                 value={clasesContratadas}
-                onChange={(e) => setClasesContratadas(Number(e.target.value))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setClasesContratadas(e.target.value)}
                 className="w-full border rounded px-3 py-2 text-sm"
               />
             </Field>
@@ -621,8 +629,10 @@ function EditarBonoModal({
               <input
                 type="number"
                 min={0}
+                inputMode="numeric"
                 value={clasesConsumidas}
-                onChange={(e) => setClasesConsumidas(Number(e.target.value))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setClasesConsumidas(e.target.value)}
                 className="w-full border rounded px-3 py-2 text-sm"
               />
             </Field>
@@ -631,8 +641,10 @@ function EditarBonoModal({
                 type="number"
                 min={0}
                 step={0.01}
+                inputMode="decimal"
                 value={precio}
-                onChange={(e) => setPrecio(Number(e.target.value))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setPrecio(e.target.value)}
                 className="w-full border rounded px-3 py-2 text-sm"
               />
             </Field>
@@ -685,7 +697,7 @@ function EditarPagoModal({
   alumnoNombre: string;
   onClose: () => void;
 }) {
-  const [importe, setImporte] = useState(pago.importe);
+  const [importe, setImporte] = useState(String(pago.importe));
   const [metodo, setMetodo] = useState<MetodoPago>(pago.metodo);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -695,7 +707,7 @@ function EditarPagoModal({
     setSubmitting(true);
     setError(null);
     try {
-      await editarPagoSuelto(tenantId, pago.pagoId, { importe, metodo });
+      await editarPagoSuelto(tenantId, pago.pagoId, { importe: Math.max(0, parseFloat(importe) || 0), metodo });
       onClose();
     } catch (e: any) {
       setError(e?.message || 'No se pudo guardar.');
@@ -720,8 +732,10 @@ function EditarPagoModal({
               type="number"
               min={0}
               step={0.01}
+              inputMode="decimal"
               value={importe}
-              onChange={(e) => setImporte(Number(e.target.value))}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => setImporte(e.target.value)}
               className="w-full border rounded px-3 py-2 text-sm"
             />
           </Field>
