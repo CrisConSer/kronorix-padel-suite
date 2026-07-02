@@ -496,6 +496,7 @@ function CrearBonoModal({
             {submitting ? 'Creando…' : 'Crear bono'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );
