@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, doc, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { crearProfesorYEnviarInvitacion, slugify } from '@/src/crearProfesorClient';
 import type { TenantDoc } from '@/src/types';
@@ -68,69 +68,162 @@ export default function ProfesoresPage() {
           </div>
         ) : (
           <ul className="space-y-2">
-            {tenants.map((t) => {
-              const planStyle =
-                t.plan === 'activo'
-                  ? { background: '#09090F', color: '#E8A020' }
-                  : t.plan === 'trial'
-                  ? { background: '#E8A02018', color: '#92400e' }
-                  : { background: '#f4f4f5', color: '#71717a' };
-
-              return (
-                <li
-                  key={t.tenantId}
-                  className="rounded-2xl overflow-hidden"
-                  style={{
-                    border: '1.5px solid #e4e4e7',
-                    opacity: !t.active ? 0.6 : 1,
-                  }}
-                >
-                  <div className="flex items-center">
-                    <div
-                      className="w-1 self-stretch shrink-0"
-                      style={{
-                        background: !t.active ? '#e4e4e7' : t.plan === 'activo' ? '#16a34a' : '#E8A020',
-                      }}
-                    />
-                    <div className="flex flex-1 items-center justify-between gap-3 px-4 py-3 bg-white flex-wrap">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-sm" style={{ color: '#09090F' }}>
-                            {t.nombreNegocio}
-                          </span>
-                          <span
-                            className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
-                            style={planStyle}
-                          >
-                            {t.plan}{!t.active ? ' · inactivo' : ''}
-                          </span>
-                        </div>
-                        <div className="text-xs mt-0.5 flex flex-wrap gap-1.5" style={{ color: '#a1a1aa' }}>
-                          <span>{t.nombreProfesor}</span>
-                          <span>·</span>
-                          <span className="font-mono">/{t.slug}</span>
-                          <span>·</span>
-                          <span>{t.email}</span>
-                        </div>
-                      </div>
-                      <a
-                        href={`/${t.slug}/calendario`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-zinc-200 hover:bg-zinc-50 transition-colors shrink-0"
-                        style={{ color: '#353542' }}
-                      >
-                        Ver app ↗
-                      </a>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
+            {tenants.map((t) => (
+              <TenantRow key={t.tenantId} tenant={t} />
+            ))}
           </ul>
         )}
       </section>
     </div>
+  );
+}
+
+function TenantRow({ tenant: t }: { tenant: TenantDoc }) {
+  const [working, setWorking] = useState(false);
+  const [confirmando, setConfirmando] = useState<'suspender' | null>(null);
+
+  async function cambiarPlan(nuevoPlan: 'trial' | 'activo' | 'suspendido') {
+    setWorking(true);
+    try {
+      await updateDoc(doc(db, 'tenants', t.tenantId), {
+        plan: nuevoPlan,
+        active: nuevoPlan !== 'suspendido',
+      });
+    } catch (e) {
+      console.error('Error cambiando plan:', e);
+    } finally {
+      setWorking(false);
+      setConfirmando(null);
+    }
+  }
+
+  const planStyle =
+    t.plan === 'activo'
+      ? { background: '#09090F', color: '#E8A020' }
+      : t.plan === 'trial'
+      ? { background: '#E8A02018', color: '#92400e' }
+      : { background: '#f4f4f5', color: '#71717a' };
+
+  const barColor = !t.active ? '#e4e4e7' : t.plan === 'activo' ? '#16a34a' : '#E8A020';
+
+  return (
+    <li
+      className="rounded-2xl overflow-hidden"
+      style={{ border: '1.5px solid #e4e4e7', opacity: !t.active ? 0.6 : 1 }}
+    >
+      <div className="flex items-stretch">
+        <div className="w-1 shrink-0" style={{ background: barColor }} />
+        <div className="flex flex-1 flex-col bg-white min-w-0">
+          {/* Fila principal */}
+          <div className="flex items-center justify-between gap-3 px-4 py-3 flex-wrap">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-sm" style={{ color: '#09090F' }}>
+                  {t.nombreNegocio}
+                </span>
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+                  style={planStyle}
+                >
+                  {t.plan}{!t.active ? ' · inactivo' : ''}
+                </span>
+              </div>
+              <div className="text-xs mt-0.5 flex flex-wrap gap-1.5" style={{ color: '#a1a1aa' }}>
+                <span>{t.nombreProfesor}</span>
+                <span>·</span>
+                <span className="font-mono">/{t.slug}</span>
+                <span>·</span>
+                <span>{t.email}</span>
+              </div>
+            </div>
+            <a
+              href={`/${t.slug}/calendario`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-zinc-200 hover:bg-zinc-50 transition-colors shrink-0"
+              style={{ color: '#353542' }}
+            >
+              Ver app ↗
+            </a>
+          </div>
+
+          {/* Barra de acciones de plan */}
+          <div
+            className="flex items-center gap-2 px-4 py-2 flex-wrap"
+            style={{ borderTop: '1px solid #f4f4f5' }}
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-widest mr-1" style={{ color: '#a1a1aa' }}>
+              Plan:
+            </span>
+
+            {/* Botón Trial */}
+            <button
+              onClick={() => cambiarPlan('trial')}
+              disabled={working || t.plan === 'trial'}
+              className="text-[11px] font-bold px-2.5 py-1 rounded-full transition-all disabled:opacity-40"
+              style={
+                t.plan === 'trial'
+                  ? { background: '#E8A020', color: '#09090F' }
+                  : { background: '#f4f4f5', color: '#71717a' }
+              }
+            >
+              Trial
+            </button>
+
+            {/* Botón Activo */}
+            <button
+              onClick={() => cambiarPlan('activo')}
+              disabled={working || t.plan === 'activo'}
+              className="text-[11px] font-bold px-2.5 py-1 rounded-full transition-all disabled:opacity-40"
+              style={
+                t.plan === 'activo'
+                  ? { background: '#09090F', color: '#E8A020' }
+                  : { background: '#f4f4f5', color: '#71717a' }
+              }
+            >
+              ✓ Activo
+            </button>
+
+            {/* Botón Suspender con confirmación */}
+            <div className="ml-auto flex items-center gap-2">
+              {confirmando === 'suspender' ? (
+                <>
+                  <span className="text-[11px]" style={{ color: '#71717a' }}>¿Suspender acceso?</span>
+                  <button
+                    onClick={() => setConfirmando(null)}
+                    className="text-[11px] px-2 py-1 rounded-lg border border-zinc-200"
+                    style={{ color: '#71717a' }}
+                  >
+                    No
+                  </button>
+                  <button
+                    onClick={() => cambiarPlan('suspendido')}
+                    disabled={working}
+                    className="text-[11px] font-bold px-2 py-1 rounded-lg disabled:opacity-50"
+                    style={{ background: '#C04810', color: 'white' }}
+                  >
+                    Sí, suspender
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => !t.active ? cambiarPlan('trial') : setConfirmando('suspender')}
+                  disabled={working}
+                  className="text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors disabled:opacity-40"
+                  style={
+                    !t.active
+                      ? { background: '#09090F', color: '#E8A020' }
+                      : { background: '#fee2e2', color: '#C04810' }
+                  }
+                >
+                  {!t.active ? '↩ Reactivar' : 'Suspender'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </li>
   );
 }
 
