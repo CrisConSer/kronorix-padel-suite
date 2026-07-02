@@ -34,7 +34,7 @@ export default function PagosPage() {
   const [tenantId, setTenantId] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (!user) return;
-    if (user.role !== 'super_admin') { setTenantId(user.tenantId); return; }
+    if (user.role !== 'super_admin') { setTenantId(user.tenantId ?? undefined); return; }
     getDocs(query(collection(db, 'tenants'), where('slug', '==', params.tenantSlug)))
       .then((snap) => { if (!snap.empty) setTenantId(snap.docs[0].data().tenantId as string); });
   }, [user?.role, user?.tenantId, params.tenantSlug]);

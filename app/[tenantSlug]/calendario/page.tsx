@@ -47,7 +47,7 @@ export default function CalendarioPage() {
   useEffect(() => {
     if (!user) return;
     if (user.role !== 'super_admin') {
-      setTenantId(user.tenantId);
+      setTenantId(user.tenantId ?? undefined);
       return;
     }
     getDocs(query(collection(db, 'tenants'), where('slug', '==', params.tenantSlug)))
