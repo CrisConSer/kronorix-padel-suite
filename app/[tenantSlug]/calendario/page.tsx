@@ -772,13 +772,10 @@ function ClaseForm({
 }) {
   const [fecha, setFecha] = useState(claseExistente?.fecha || fechaFija || '');
   const [hora, setHora] = useState(claseExistente?.hora || '18:00');
-  const [duracionMinutos, setDuracionMinutos] = useState(claseExistente?.duracionMinutos || 60);
+  const [duracionMinutos, setDuracionMinutos] = useState(String(claseExistente?.duracionMinutos || 60));
   const [pista, setPista] = useState(claseExistente?.pista || '');
   const [tipo, setTipo] = useState<TipoClase>(claseExistente?.tipo || 'individual');
-  const [capacidad, setCapacidad] = useState(claseExistente?.capacidad || 1);
-  // En modo editar, si tagsCompatibles tiene exactamente 1 tag, lo
-  // tratamos como "el tag elegido" para precargar el selector. Si tiene
-  // 0 o varios (porque se calculó por unión de alumnos), se deja vacío.
+  const [capacidad, setCapacidad] = useState(String(claseExistente?.capacidad || 1));
   const tagInicial =
     claseExistente?.tagsCompatibles?.length === 1 ? claseExistente.tagsCompatibles[0] : '';
   const [tagFiltroId, setTagFiltroId] = useState<string>(tagInicial);
@@ -787,6 +784,9 @@ function ClaseForm({
   const [notas, setNotas] = useState(claseExistente?.notas || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Buscador de alumnos
+  const [busquedaAlumno, setBusquedaAlumno] = useState('');
+  const [buscadorAbierto, setBuscadorAbierto] = useState(false);
 
   // Si hay un tag de nivel elegido, solo se pueden seleccionar alumnos
   // que tengan ESE tag — evita mezclar niveles sin querer en la misma
@@ -798,6 +798,12 @@ function ClaseForm({
     if (!tagFiltroId) return true;
     return (a.tagsIds || []).includes(tagFiltroId) || alumnosIds.includes(a.alumnoId);
   });
+
+  const alumnosFiltradosBuscador = alumnosSeleccionables.filter((a) =>
+    !busquedaAlumno || a.nombre.toLowerCase().includes(busquedaAlumno.toLowerCase())
+  );
+
+  const alumnosAsignados = alumnos.filter((a) => alumnosIds.includes(a.alumnoId));
 
   function toggleAlumno(id: string) {
     setAlumnosIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -820,17 +826,19 @@ function ClaseForm({
     setSubmitting(true);
     setError(null);
     try {
-      if (alumnosIds.length > capacidad) {
+      const capacidadNum = Math.max(1, parseInt(capacidad) || 1);
+      const duracionNum = Math.max(15, parseInt(duracionMinutos) || 60);
+      if (alumnosIds.length > capacidadNum) {
         throw new Error('Has asignado más alumnos de los que permite el cupo.');
       }
       if (modo === 'crear') {
         await crearClase(tenantId, {
           fecha,
           hora,
-          duracionMinutos,
+          duracionMinutos: duracionNum,
           pista: pista.trim() || undefined,
           tipo,
-          capacidad,
+          capacidad: capacidadNum,
           alumnosIds,
           titulo: titulo.trim() || undefined,
           notas: notas.trim() || undefined,
@@ -842,10 +850,10 @@ function ClaseForm({
         await actualizarClase(tenantId, claseExistente.claseId, {
           fecha,
           hora,
-          duracionMinutos,
+          duracionMinutos: duracionNum,
           pista: pista.trim() || undefined,
           tipo,
-          capacidad,
+          capacidad: capacidadNum,
           alumnosIds,
           titulo: titulo.trim() || undefined,
           notas: notas.trim() || undefined,
@@ -889,8 +897,10 @@ function ClaseForm({
             type="number"
             min={15}
             step={15}
+            inputMode="numeric"
             value={duracionMinutos}
-            onChange={(e) => setDuracionMinutos(Number(e.target.value))}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => setDuracionMinutos(e.target.value)}
             className="w-full border rounded px-3 py-2 text-sm"
           />
         </Field>
@@ -917,8 +927,10 @@ function ClaseForm({
           <input
             type="number"
             min={1}
+            inputMode="numeric"
             value={capacidad}
-            onChange={(e) => setCapacidad(Number(e.target.value))}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => setCapacidad(e.target.value)}
             className="w-full border rounded px-3 py-2 text-sm"
           />
         </Field>
@@ -953,34 +965,107 @@ function ClaseForm({
         </p>
       )}
 
-      <Field label={`Alumnos asignados (${alumnosIds.length}/${capacidad})`}>
+      {/* Selector de alumnos con buscador */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-zinc-600">
+            Alumnos asignados ({alumnosIds.length}/{capacidad || '?'})
+          </span>
+          {alumnosIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setAlumnosIds([])}
+              className="text-[11px] text-zinc-400 hover:text-red-500"
+            >
+              Quitar todos
+            </button>
+          )}
+        </div>
+
+        {/* Pills de asignados */}
+        {alumnosAsignados.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {alumnosAsignados.map((a) => (
+              <span
+                key={a.alumnoId}
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium"
+                style={{ background: '#09090F', color: '#E8A020' }}
+              >
+                {a.nombre}
+                <button
+                  type="button"
+                  onClick={() => toggleAlumno(a.alumnoId)}
+                  className="leading-none opacity-70 hover:opacity-100 ml-0.5"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Buscador desplegable */}
         {alumnosSeleccionables.length === 0 ? (
           <p className="text-xs text-zinc-400">
             {tagFiltroId ? 'No tienes alumnos activos con ese tag.' : 'No tienes alumnos activos todavía.'}
           </p>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {alumnosSeleccionables.map((a) => {
-              const activo = alumnosIds.includes(a.alumnoId);
-              return (
+          <div className="relative">
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+              </svg>
+              <input
+                type="text"
+                value={busquedaAlumno}
+                onFocus={() => setBuscadorAbierto(true)}
+                onChange={(e) => { setBusquedaAlumno(e.target.value); setBuscadorAbierto(true); }}
+                placeholder="Buscar y añadir alumno…"
+                className="w-full pl-8 pr-3 py-2 border rounded text-sm outline-none"
+              />
+            </div>
+            {buscadorAbierto && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                {alumnosFiltradosBuscador.length === 0 ? (
+                  <p className="text-xs text-zinc-400 px-3 py-2">Sin resultados</p>
+                ) : (
+                  alumnosFiltradosBuscador.map((a) => {
+                    const asignado = alumnosIds.includes(a.alumnoId);
+                    return (
+                      <button
+                        key={a.alumnoId}
+                        type="button"
+                        onClick={() => {
+                          toggleAlumno(a.alumnoId);
+                          setBusquedaAlumno('');
+                          setBuscadorAbierto(false);
+                        }}
+                        className="w-full text-left flex items-center justify-between px-3 py-2 hover:bg-zinc-50 text-sm transition-colors"
+                      >
+                        <span className={asignado ? 'font-semibold text-zinc-900' : 'text-zinc-700'}>
+                          {a.nombre}
+                        </span>
+                        {asignado ? (
+                          <span className="text-[11px] font-bold px-1.5 py-0.5 rounded" style={{ background: '#E8A020', color: '#09090F' }}>✓</span>
+                        ) : (
+                          <span className="text-[11px] text-zinc-400">+ Añadir</span>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
                 <button
                   type="button"
-                  key={a.alumnoId}
-                  onClick={() => toggleAlumno(a.alumnoId)}
-                  className={[
-                    'text-xs px-2.5 py-1 rounded-full border',
-                    activo
-                      ? 'bg-amber-500 text-zinc-950 border-amber-500 font-medium'
-                      : 'bg-white text-zinc-600 border-zinc-300',
-                  ].join(' ')}
+                  onClick={() => { setBuscadorAbierto(false); setBusquedaAlumno(''); }}
+                  className="w-full text-center text-[11px] text-zinc-400 hover:text-zinc-600 py-2 border-t border-zinc-100"
                 >
-                  {a.nombre}
+                  Cerrar
                 </button>
-              );
-            })}
+              </div>
+            )}
           </div>
         )}
-      </Field>
+      </div>
 
       <Field label="Notas (opcional)">
         <textarea

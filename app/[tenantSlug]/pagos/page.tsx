@@ -41,6 +41,11 @@ export default function PagosPage() {
   const [bonoParaEditar, setBonoParaEditar] = useState<BonoDoc | null>(null);
   const [pagoParaEditar, setPagoParaEditar] = useState<PagoDoc | null>(null);
 
+  // Filtros
+  const [busquedaBono, setBusquedaBono] = useState('');
+  const [filtroBono, setFiltroBono] = useState<'todos' | 'activo' | 'agotado' | 'caducado'>('todos');
+  const [busquedaHistorial, setBusquedaHistorial] = useState('');
+
   useEffect(() => {
     if (!tenantId || user?.role !== 'admin') return;
     const q = query(
@@ -93,6 +98,23 @@ export default function PagosPage() {
   const alumnosBono = alumnos.filter((a) => a.modalidad === 'bono');
   const alumnosSuelta = alumnos.filter((a) => a.modalidad === 'suelta');
 
+  const alumnosBonoFiltrados = alumnosBono.filter((a) => {
+    if (busquedaBono && !a.nombre.toLowerCase().includes(busquedaBono.toLowerCase())) return false;
+    if (filtroBono !== 'todos') {
+      const bono = bonosPorAlumno.get(a.alumnoId);
+      if (!bono) return filtroBono === 'caducado'; // sin bono = tratar como caducado
+      const estado = estadoEfectivoBono(bono);
+      if (estado !== filtroBono) return false;
+    }
+    return true;
+  });
+
+  const pagosFiltrados = pagos.filter((p) => {
+    if (!busquedaHistorial) return true;
+    const nombre = (alumnosPorId.get(p.alumnoId)?.nombre || '').toLowerCase();
+    return nombre.includes(busquedaHistorial.toLowerCase());
+  });
+
   async function handleBorrarPago(pago: PagoDoc) {
     const mensaje =
       pago.tipo === 'bono'
@@ -125,19 +147,58 @@ export default function PagosPage() {
           <h2 className="text-xs font-bold tracking-widest uppercase" style={{ color: '#353542' }}>Alumnos con bono</h2>
           {alumnosBono.length > 0 && (
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#09090F', color: '#E8A020' }}>
-              {alumnosBono.length}
+              {alumnosBonoFiltrados.length}/{alumnosBono.length}
             </span>
           )}
         </div>
+
+        {/* Filtros bonos */}
+        {alumnosBono.length > 0 && (
+          <div className="flex flex-col gap-2 mb-3">
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+              </svg>
+              <input
+                type="text"
+                value={busquedaBono}
+                onChange={(e) => setBusquedaBono(e.target.value)}
+                placeholder="Buscar alumno…"
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-200 bg-white text-sm outline-none"
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {(['todos', 'activo', 'agotado', 'caducado'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFiltroBono(f)}
+                  className="text-[11px] font-bold px-2.5 py-1 rounded-full transition-all capitalize"
+                  style={
+                    filtroBono === f
+                      ? { background: '#09090F', color: '#E8A020' }
+                      : { background: '#f4f4f5', color: '#71717a' }
+                  }
+                >
+                  {f === 'todos' ? 'Todos' : f.charAt(0).toUpperCase() + f.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {loadingDatos ? (
           <p className="text-sm" style={{ color: '#a1a1aa' }}>Cargando…</p>
         ) : alumnosBono.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-300 py-8 text-center">
             <p className="text-sm" style={{ color: '#a1a1aa' }}>No tienes alumnos con modalidad bono.</p>
           </div>
+        ) : alumnosBonoFiltrados.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-zinc-300 py-6 text-center">
+            <p className="text-sm" style={{ color: '#a1a1aa' }}>Ningún alumno coincide con los filtros.</p>
+          </div>
         ) : (
           <ul className="space-y-2">
-            {alumnosBono.map((a) => {
+            {alumnosBonoFiltrados.map((a) => {
               const bono = bonosPorAlumno.get(a.alumnoId);
               return (
                 <BonoRow
@@ -188,23 +249,40 @@ export default function PagosPage() {
             <span className="text-[11px]" style={{ color: '#a1a1aa' }}>Últimos {Math.min(pagos.length, 30)}</span>
           )}
         </div>
+
+        {pagos.length > 0 && (
+          <div className="relative mb-3">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+            <input
+              type="text"
+              value={busquedaHistorial}
+              onChange={(e) => setBusquedaHistorial(e.target.value)}
+              placeholder="Buscar por alumno…"
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-200 bg-white text-sm outline-none"
+            />
+          </div>
+        )}
+
         {pagos.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-300 py-8 text-center">
             <p className="text-sm" style={{ color: '#a1a1aa' }}>Todavía no hay pagos registrados.</p>
           </div>
+        ) : pagosFiltrados.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-zinc-300 py-6 text-center">
+            <p className="text-sm" style={{ color: '#a1a1aa' }}>Sin pagos para "{busquedaHistorial}".</p>
+          </div>
         ) : (
-          <ul
-            className="rounded-2xl overflow-hidden"
-            style={{ border: '1.5px solid #e4e4e7' }}
-          >
-            {pagos.slice(0, 30).map((p, i) => (
+          <ul className="rounded-2xl overflow-hidden" style={{ border: '1.5px solid #e4e4e7' }}>
+            {pagosFiltrados.slice(0, 30).map((p, i) => (
               <PagoRow
                 key={p.pagoId}
                 pago={p}
                 nombreAlumno={alumnosPorId.get(p.alumnoId)?.nombre || 'Alumno'}
                 onEditar={() => setPagoParaEditar(p)}
                 onBorrar={() => handleBorrarPago(p)}
-                esUltimo={i === Math.min(pagos.length, 30) - 1}
+                esUltimo={i === Math.min(pagosFiltrados.length, 30) - 1}
               />
             ))}
           </ul>
