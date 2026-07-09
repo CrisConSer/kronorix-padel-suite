@@ -7,7 +7,10 @@ import { db } from '@/lib/firebase';
 import { useTenantGuard } from '@/src/useTenantGuard';
 import type { AlumnoDoc, BonoDoc, ClaseDoc, PagoDoc, TagDoc, TenantDoc } from '@/src/types';
 import { estadoEfectivoBono, clasesRestantes } from '@/src/pagosClient';
-import { hoyYmd } from '@/src/utils';
+
+function hoyYmd(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 type Mensaje = {
   id: string;
