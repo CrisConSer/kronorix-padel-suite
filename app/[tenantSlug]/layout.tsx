@@ -13,6 +13,7 @@ const SECCIONES_ADMIN = [
   { href: '/calendario', label: 'Calendario' },
   { href: '/pagos', label: 'Pagos' },
   { href: '/dashboard', label: 'Cuadro de mando' },
+  { href: '/asistente', label: '✦ Asistente' },
 ];
 
 const SECCIONES_ALUMNO = [{ href: '/mi-cuenta', label: 'Mi cuenta' }];
