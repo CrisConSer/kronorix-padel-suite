@@ -1,6 +1,21 @@
 'use client';
 
-import type { EstadisticasTenant } from '../functions/getEstadisticasProfesores';
+/**
+ * Tipo duplicado a propósito respecto al de la Cloud Function.
+ * El frontend (Next.js/App Hosting) y las Functions son dos paquetes de
+ * build distintos con dependencias distintas (esta carpeta no tiene
+ * firebase-admin instalado). Importar tipos de uno a otro rompe el build
+ * de Next porque intenta compilar también el archivo de la función.
+ * Si cambias la forma de los datos en getEstadisticasProfesores.ts,
+ * actualiza también este tipo a mano.
+ */
+export type EstadisticasTenant = {
+  tenantId: string;
+  totalAlumnos: number;
+  totalClases: number;
+  ultimaActividad: string | null;
+  estado: 'activo' | 'atencion' | 'inactivo' | 'sin-datos';
+};
 
 /**
  * src/ProfesorStatsCard.tsx

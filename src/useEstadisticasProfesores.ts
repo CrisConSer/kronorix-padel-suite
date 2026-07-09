@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '@/lib/firebase';
-import type { EstadisticasTenant } from '../functions/getEstadisticasProfesores';
+import type { EstadisticasTenant } from './ProfesorStatsCard';
 
 /**
  * src/useEstadisticasProfesores.ts
