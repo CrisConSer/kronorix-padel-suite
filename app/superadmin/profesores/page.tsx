@@ -7,6 +7,8 @@ import { db } from '@/lib/firebase';
 import { crearProfesorYEnviarInvitacion, slugify } from '@/src/crearProfesorClient';
 import type { TenantDoc } from '@/src/types';
 import { useSessionUser } from '@/src/useSessionUser';
+import { useEstadisticasProfesores } from '@/src/useEstadisticasProfesores';
+import { ProfesorStatsCard, type EstadisticasTenant } from '@/src/ProfesorStatsCard';
 
 /**
  * /superadmin/profesores
@@ -21,6 +23,8 @@ export default function ProfesoresPage() {
   const [tenants, setTenants] = useState<TenantDoc[]>([]);
   const [loadingTenants, setLoadingTenants] = useState(true);
   const [editando, setEditando] = useState<TenantDoc | null>(null);
+  const { porTenant: estadisticasPorTenant, loading: loadingStats } =
+    useEstadisticasProfesores(user?.role === 'super_admin');
 
   useEffect(() => {
     if (!user || user.role !== 'super_admin') return;
@@ -70,7 +74,13 @@ export default function ProfesoresPage() {
         ) : (
           <ul className="space-y-2">
             {tenants.map((t) => (
-              <TenantRow key={t.tenantId} tenant={t} onEditar={() => setEditando(t)} />
+              <TenantRow
+                key={t.tenantId}
+                tenant={t}
+                onEditar={() => setEditando(t)}
+                stats={estadisticasPorTenant[t.tenantId]}
+                loadingStats={loadingStats}
+              />
             ))}
           </ul>
         )}
@@ -86,7 +96,17 @@ export default function ProfesoresPage() {
   );
 }
 
-function TenantRow({ tenant: t, onEditar }: { tenant: TenantDoc; onEditar: () => void }) {
+function TenantRow({
+  tenant: t,
+  onEditar,
+  stats,
+  loadingStats,
+}: {
+  tenant: TenantDoc;
+  onEditar: () => void;
+  stats: EstadisticasTenant | undefined;
+  loadingStats: boolean;
+}) {
   const [working, setWorking] = useState(false);
   const [confirmando, setConfirmando] = useState<'suspender' | 'eliminar' | null>(null);
 
@@ -238,6 +258,10 @@ function TenantRow({ tenant: t, onEditar }: { tenant: TenantDoc; onEditar: () =>
                 </>
               )}
             </div>
+          </div>
+
+          <div className="px-4">
+            <ProfesorStatsCard stats={stats} loading={loadingStats} />
           </div>
         </div>
       </div>
