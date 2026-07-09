@@ -18,7 +18,7 @@
  * -----------------------------------------------------------------------
  */
 
-import * as functions from 'firebase-functions';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
 
 if (!admin.apps.length) admin.initializeApp();
@@ -48,18 +48,14 @@ function calcularEstado(ultimaActividad: Date | null): EstadoActividad {
   return 'inactivo';
 }
 
-export const getEstadisticasProfesores = functions.https.onCall(
-  async (_data, context) => {
+export const getEstadisticasProfesores = onCall(async (request) => {
     // 1) Solo un super admin autenticado puede llamar a esto.
-    if (!context.auth) {
-      throw new functions.https.HttpsError(
-        'unauthenticated',
-        'Debes iniciar sesión.'
-      );
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Debes iniciar sesión.');
     }
-    const callerDoc = await db.doc(`users/${context.auth.uid}`).get();
+    const callerDoc = await db.doc(`users/${request.auth.uid}`).get();
     if (callerDoc.data()?.role !== 'super_admin') {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         'permission-denied',
         'Solo el super admin puede ver estadísticas de profesores.'
       );
